@@ -1,131 +1,100 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Camera, LayoutGrid, LogOut, MapPin, MessageSquare, Search, Store, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, Mic, Phone, Search, User } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { AuthDialog } from "@/components/site/auth-dialog";
-import { signOutUser, useAuth } from "@/lib/auth-store";
+import { HeaderNav } from "@/components/site/header-nav";
+import { Wordmark } from "@/components/site/wordmark";
+import { MobileMenu } from "@/components/site/mobile-menu";
+import { useAuth } from "@/lib/auth-store";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { CITIES } from "@/lib/data";
 
-const NAV = [
-  { href: "/search", label: "Products", icon: LayoutGrid },
-  { href: "/dashboard", label: "Sell", icon: Store },
-  { href: "/dashboard", label: "Messages", icon: MessageSquare },
-];
+const iconBtn =
+  "grid size-10 place-items-center rounded-full text-white transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none";
 
-const itemClass =
-  "flex flex-col items-center gap-0.5 rounded-lg px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-brand/10 hover:text-brand";
-
-function AuthItem() {
+function AuthButton() {
   const isSignedIn = useAuth((s) => s.user !== null);
   if (!isFirebaseConfigured) return null;
-  return isSignedIn ? (
-    <button type="button" onClick={() => signOutUser()} className={itemClass}>
-      <LogOut className="size-5" />
-      Sign out
-    </button>
-  ) : (
-    <AuthDialog
-      label=""
-      trigger={
-        <button type="button" className={itemClass}>
-          <User className="size-5" />
-          Sign in
-        </button>
-      }
-    />
+  return (
+    <Link href={isSignedIn ? "/dashboard" : "/signin"} aria-label={isSignedIn ? "My account" : "Sign in"} className={iconBtn}>
+      <User className="size-5" />
+    </Link>
   );
 }
 
 export function SiteHeader() {
   const router = useRouter();
-  const [q, setQ] = useState("");
-  const [city, setCity] = useState("");
+  const [menu, setMenu] = useState(false);
+  const [term, setTerm] = useState("");
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const p = new URLSearchParams();
-    if (q.trim()) p.set("q", q.trim());
-    if (city) p.set("city", city);
-    router.push(`/search?${p.toString()}`);
+    router.push(term.trim() ? `/collections/all?q=${encodeURIComponent(term.trim())}` : "/collections/all");
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[90rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
-          <Image src="/logo-wordmark.png" alt="Alpha Mart" width={108} height={36} priority className="h-9 w-auto" />
-        </Link>
+    <header className="sticky top-0 z-50 shadow-md">
+      <div className="bg-skyblue text-white">
+        <div className="container-x grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 py-2.5 md:grid-cols-[auto_minmax(0,40rem)_auto] md:justify-between">
+          <div className="flex items-center gap-1">
+            <button type="button" aria-label="Open menu" onClick={() => setMenu(true)} className={`${iconBtn} md:hidden`}>
+              <Menu className="size-6" />
+            </button>
+            <Link href="/" aria-label="Alpha Mart home" className="rounded-lg px-1 py-1">
+              <Wordmark tone="light" className="text-[1.7rem]" />
+            </Link>
+          </div>
 
-        <form
-          onSubmit={onSubmit}
-          className="order-last flex w-full items-center gap-2 md:order-none md:w-auto md:flex-1"
-        >
-          <label className="relative hidden shrink-0 sm:block">
-            <MapPin className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-red-500" />
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              aria-label="City"
-              className="h-10 w-36 appearance-none rounded-lg border border-border bg-card pr-2 pl-8 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
-            >
-              <option value="">All India</option>
-              {CITIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <div className="flex h-10 flex-1 items-center overflow-hidden rounded-lg border border-border bg-card focus-within:border-brand focus-within:ring-3 focus-within:ring-ring/30">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              aria-label="Search products"
-              placeholder="Enter product / service to search"
-              className="h-10 rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent"
+          <form
+            onSubmit={onSubmit}
+            role="search"
+            className="order-last col-span-3 flex h-11 items-center gap-2 rounded-full bg-white pr-1.5 pl-4 text-foreground shadow-inner focus-within:ring-2 focus-within:ring-ember md:order-none md:col-span-1"
+          >
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              aria-label="Search"
+              placeholder="What are you looking for.."
+              className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
+            {term && (
+              <button type="button" onClick={() => setTerm("")} className="px-2 text-xs text-muted-foreground transition hover:text-foreground">
+                Clear
+              </button>
+            )}
             <button
               type="button"
-              aria-label="Search by image"
-              onClick={() => toast.info("Visual search coming soon")}
-              className="grid h-10 w-10 shrink-0 place-items-center text-brand transition hover:bg-brand/10"
+              aria-label="Voice search"
+              onClick={() => toast.info("Voice search coming soon")}
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-navy text-white transition hover:bg-navy-deep"
             >
-              <Camera className="size-5" />
+              <Mic className="size-4" />
             </button>
-            <button
-              type="submit"
-              aria-label="Search"
-              className="grid h-10 w-12 shrink-0 place-items-center bg-brand text-primary-foreground transition hover:brightness-110"
+          </form>
+
+          <div className="flex items-center justify-end gap-1">
+            <a
+              href="https://wa.me/?text=Hi%20Alpha%20Mart"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mr-2 hidden items-center gap-2 rounded-lg px-2 py-1 text-left text-[11px] leading-tight transition hover:bg-white/15 lg:flex"
             >
-              <Search className="size-5" />
-            </button>
+              <Phone className="size-5" />
+              <span>
+                Our Sales / Support
+                <br />
+                <strong className="text-xs">Chat on WhatsApp</strong>
+              </span>
+            </a>
+            <AuthButton />
           </div>
-        </form>
-
-        <Button
-          variant="outline"
-          className="hidden h-10 border-brand/40 text-brand hover:bg-brand/10 lg:inline-flex"
-          nativeButton={false}
-          render={<Link href="/requirement" />}
-        >
-          Get Best Price
-        </Button>
-
-        <nav aria-label="Primary" className="ml-auto flex items-center md:ml-0">
-          {NAV.map((n) => (
-            <Link key={n.label} href={n.href} className={`${itemClass} hidden sm:flex`}>
-              <n.icon className="size-5" />
-              {n.label}
-            </Link>
-          ))}
-          <AuthItem />
-        </nav>
+        </div>
       </div>
+      <HeaderNav />
+      <MobileMenu open={menu} onClose={() => setMenu(false)} />
     </header>
   );
 }

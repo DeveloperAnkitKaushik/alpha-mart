@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     // Vendored React Bits components (copy-paste registry, not our code).
-    "src/components/{SplitText,CountUp}.tsx",
+    "src/components/CountUp.tsx",
   ]),
 ]);
 

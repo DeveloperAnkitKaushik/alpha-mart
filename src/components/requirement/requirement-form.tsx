@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, fieldErrors, selectClass } from "@/components/site/field";
 import { createRequirement } from "@/lib/api";
-import { CATEGORIES, requirementSchema } from "@/lib/data";
+import { requirementSchema } from "@/lib/data";
+import { SHOP_CATEGORIES } from "@/lib/shop-data";
 
 export function RequirementForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -58,19 +59,19 @@ export function RequirementForm() {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-3xl border border-border bg-card p-6 sm:p-8">
       <Field label="What do you need?" error={errors.title}>
-        <Input name="title" placeholder="e.g. 500 cotton t-shirts, 180 GSM" />
+        <Input name="title" placeholder="e.g. 10 laptops for an office, Core i5, 8 GB RAM" />
       </Field>
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Category" error={errors.category}>
           <select name="category" defaultValue="" className={selectClass}>
             <option value="" disabled>Select…</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
+            {SHOP_CATEGORIES.map((c) => (
+              <option key={c.slug} value={c.slug}>{c.label}</option>
             ))}
           </select>
         </Field>
         <Field label="Quantity" error={errors.quantity}>
-          <Input name="quantity" placeholder="e.g. 500 pieces" />
+          <Input name="quantity" placeholder="e.g. 10 units" />
         </Field>
         <Field label="Delivery city" error={errors.city}>
           <Input name="city" autoComplete="address-level2" />

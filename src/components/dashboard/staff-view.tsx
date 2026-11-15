@@ -1,0 +1,79 @@
+"use client";
+
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { RotateCw, ServerCrash } from "lucide-react";
+import { StateCard } from "@/components/site/state-card";
+import { stateBtn } from "@/components/site/state-styles";
+import { DashboardSkeleton } from "./dashboard-skeleton";
+import { useAuth } from "@/lib/auth-store";
+import { updateItem, type InboxItem, type Status } from "@/lib/dashboard-api";
+import { downloadCsv, filterItems, type InboxFilter } from "@/lib/inbox";
+import { ActivityChart } from "./activity-chart";
+import { DetailDrawer } from "./detail-drawer";
+import { InboxTable } from "./inbox-table";
+import { InboxToolbar } from "./inbox-toolbar";
+import { KpiCards } from "./kpi-cards";
+import { useInbox, useNow } from "./use-inbox";
+
+const INITIAL_FILTER: InboxFilter = { term: "", kind: "all", status: "all", sort: "newest" };
+
+export function StaffView() {
+  const { items, error, retry } = useInbox("staff");
+  const now = useNow();
+  const [filter, setFilter] = useState(INITIAL_FILTER);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const deferredFilter = useDeferredValue(filter);
+
+  const shown = useMemo(() => (items ? filterItems(items, deferredFilter) : []), [items, deferredFilter]);
+  const open = items?.find((i) => i.key === openKey) ?? null;
+
+  const onStatus = useCallback((item: InboxItem, status: Status) => {
+    updateItem(item, { status, notes: item.notes }, useAuth.getState().user?.uid ?? "").catch(() =>
+      toast.error("Could not update status. Check your staff access."),
+    );
+  }, []);
+
+  if (error) {
+    return (
+      <StateCard
+        icon={ServerCrash}
+        tone="error"
+        title="We couldn't load the inbox"
+        body="This usually means the latest Firestore rules aren't deployed yet, or your admins entry is missing. Check both, then try again."
+      >
+        <button type="button" onClick={retry} className={stateBtn.primary}>
+          <RotateCw className="size-4" /> Try again
+        </button>
+      </StateCard>
+    );
+  }
+  if (!items) {
+    return (
+      <DashboardSkeleton withHeader={false} />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <KpiCards items={items} />
+      <ActivityChart items={items} now={now} />
+      <section aria-labelledby="inbox-title" className="space-y-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="inbox-title" className="text-xl font-extrabold text-navy-deep">Inbox</h2>
+          <p className="text-sm font-semibold text-muted-foreground" aria-live="polite">
+            {shown.length} of {items.length}
+          </p>
+        </div>
+        <InboxToolbar
+          filter={filter}
+          onChange={(patch) => setFilter((f) => ({ ...f, ...patch }))}
+          shown={shown.length}
+          onExport={() => downloadCsv(shown)}
+        />
+        <InboxTable items={shown} now={now} onOpen={setOpenKey} onStatus={onStatus} />
+      </section>
+      <DetailDrawer item={open} onClose={() => setOpenKey(null)} />
+    </div>
+  );
+}

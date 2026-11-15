@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Field, fieldErrors } from "@/components/site/field";
 import { createLead } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { leadSchema, type Product } from "@/lib/data";
 
-export function LeadDialog({ product }: { product: Product }) {
+export function LeadDialog({ product, className }: { product: Product; className?: string }) {
   const [open, setOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -51,7 +52,7 @@ export function LeadDialog({ product }: { product: Product }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="lg" className="h-11 w-full rounded-full text-base" />}>
+      <DialogTrigger render={<Button size="lg" className={cn("h-11 w-full rounded-full text-base", className)} />}>
         Get best price
       </DialogTrigger>
       <DialogContent>

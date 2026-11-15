@@ -1,6 +1,5 @@
 import Link from "next/link";
 import credits from "@/lib/photo-credits.json";
-import { resolveSlug } from "@/lib/data";
 
 export const metadata = { title: "Photo credits — Alpha Mart" };
 
@@ -9,7 +8,7 @@ const licenseLabel = (l: string) => l.replace(/^pdm/i, "Public domain").replace
 export default function CreditsPage() {
   const rows = Object.entries(credits as Record<string, { title: string | null; creator: string | null; license: string; url: string }>);
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-10 pb-24">
+    <div className="container-x pt-10 pb-24"><div className="mx-auto max-w-3xl">
       <h1 className="text-3xl font-bold tracking-tight">Photo credits</h1>
       <p className="mt-2 mb-8 text-muted-foreground">
         Category photos are openly licensed and found through Wikimedia Commons and Openverse. Thank you to the photographers.
@@ -18,7 +17,7 @@ export default function CreditsPage() {
         {rows.map(([slug, c]) => (
           <li key={slug} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-medium">{resolveSlug(slug.split("~")[0])?.sub?.label ?? slug}</p>
+              <p className="font-medium">{slug.startsWith("shop-") ? slug.slice(5).split("~")[0].replace(/-/g, " ") : "Impact section photo"}</p>
               <p className="text-sm text-muted-foreground">
                 “{c.title ?? "Untitled"}” by {c.creator ?? "unknown"}
               </p>
@@ -34,6 +33,6 @@ export default function CreditsPage() {
           </li>
         ))}
       </ul>
-    </div>
+    </div></div>
   );
 }

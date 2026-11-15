@@ -7,7 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-urbanist);
+  --font-brand: var(--font-bricolage);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -122,7 +123,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply overflow-x-clip bg-background text-foreground;
   }
   html {
     @apply font-sans;
@@ -152,6 +153,47 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
   .animate-float {
+    animation: none;
+  }
+}
+
+@theme inline {
+  --color-navy: oklch(0.44 0.14 257);
+  --color-navy-deep: oklch(0.3 0.1 258);
+  --color-cream: oklch(0.975 0.025 80);
+  --color-peach: oklch(0.92 0.07 70);
+  --color-ember: oklch(0.72 0.17 55);
+}
+
+@theme inline {
+  --color-skyblue: oklch(0.5 0.14 252);
+}
+
+@utility container-x {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1500px;
+  padding-inline: 1rem;
+  @media (min-width: 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (min-width: 64rem) {
+    padding-inline: 2rem;
+  }
+}
+
+@theme inline {
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="skeleton"]::before {
     animation: none;
   }
 }

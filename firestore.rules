@@ -1,8 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner() {
+      return signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Staff may only change the workflow fields, and must stamp the write as their own.
+    function validStaffUpdate() {
+      let d = request.resource.data;
+      return isAdmin()
+        && d.diff(resource.data).affectedKeys().hasOnly(['status', 'notes', 'updatedAt', 'updatedBy'])
+        && d.status in ['new', 'contacted', 'quoted', 'won', 'lost']
+        && d.notes is string && d.notes.size() <= 2000
+        && d.updatedAt == request.time
+        && d.updatedBy == request.auth.uid;
+    }
+
     match /products/{id} {
       allow read: if true;
+      allow write: if false;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false;
     }
 
@@ -11,8 +39,9 @@ service cloud.firestore {
         && request.resource.data.name is string && request.resource.data.name.size() <= 100
         && request.resource.data.phone.matches('^[6-9][0-9]{9}$')
         && (request.resource.data.uid == null || request.resource.data.uid == request.auth.uid);
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow update, delete: if false;
+      allow read: if isAdmin() || isOwner();
+      allow update: if validStaffUpdate();
+      allow delete: if false;
     }
 
     match /requirements/{id} {
@@ -20,8 +49,9 @@ service cloud.firestore {
         && request.resource.data.title is string && request.resource.data.title.size() <= 200
         && request.resource.data.phone.matches('^[6-9][0-9]{9}$')
         && (request.resource.data.uid == null || request.resource.data.uid == request.auth.uid);
-      allow read: if request.auth != null;
-      allow update, delete: if false;
+      allow read: if isAdmin() || isOwner();
+      allow update: if validStaffUpdate();
+      allow delete: if false;
     }
   }
 }
