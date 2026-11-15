@@ -9,14 +9,12 @@ import { HeaderNav } from "@/components/site/header-nav";
 import { Wordmark } from "@/components/site/wordmark";
 import { MobileMenu } from "@/components/site/mobile-menu";
 import { useAuth } from "@/lib/auth-store";
-import { isFirebaseConfigured } from "@/lib/firebase";
 
 const iconBtn =
   "grid size-10 place-items-center rounded-full text-white transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none";
 
 function AuthButton() {
   const isSignedIn = useAuth((s) => s.user !== null);
-  if (!isFirebaseConfigured) return null;
   return (
     <Link href={isSignedIn ? "/dashboard" : "/signin"} aria-label={isSignedIn ? "My account" : "Sign in"} className={iconBtn}>
       <User className="size-5" />
