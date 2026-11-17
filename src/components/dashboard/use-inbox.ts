@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSiteContent } from "@/components/site/site-content";
 import { subscribeInbox, subscribeMine, type InboxItem } from "@/lib/dashboard-api";
 
 type InboxState = { items: InboxItem[] | null; error: boolean; retry: () => void };
@@ -10,10 +11,17 @@ export function useInbox(mode: "staff" | { uid: string }): InboxState {
   const uid = mode === "staff" ? null : mode.uid;
   const [state, setState] = useState<{ items: InboxItem[] | null; error: boolean }>({ items: null, error: false });
   const [attempt, setAttempt] = useState(0);
+  // Read at call time so a catalogue change doesn't tear down the live listener.
+  const products = useSiteContent().products;
+  const productsRef = useRef(products);
   useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
+  useEffect(() => {
+    const nameOf = (id: string) => productsRef.current.find((p) => p.id === id)?.name ?? id;
     const onData = (items: InboxItem[]) => setState({ items, error: false });
     const onError = () => setState((s) => ({ ...s, error: true }));
-    return uid ? subscribeMine(uid, onData, onError) : subscribeInbox(onData, onError);
+    return uid ? subscribeMine(uid, nameOf, onData, onError) : subscribeInbox(nameOf, onData, onError);
   }, [uid, attempt]);
   const retry = useCallback(() => {
     setState({ items: null, error: false });

@@ -29,6 +29,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Everything the admin edits under Dashboard → Items, stored as one validated JSON string.
+    match /site/content {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['json'])
+        && request.resource.data.json is string
+        && request.resource.data.json.size() < 1000000;
+    }
+
+    // Admin-uploaded images (base64 WebP/JPEG), served by /api/img/{id}. Write-once.
+    match /images/{id} {
+      allow get: if true;
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['data', 'type', 'by', 'createdAt'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 1000000
+        && request.resource.data.type in ['image/webp', 'image/jpeg']
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
     match /admins/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false;

@@ -7,7 +7,9 @@ import { ShopImage } from "@/components/shop/shop-image";
 import { LeadDialog } from "@/components/site/lead-dialog";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { Reveal } from "@/components/site/reveal";
-import { DEALS, dealToProduct, discountPct, type Deal } from "@/lib/shop-data";
+import { dealToProduct, discountPct, type Deal } from "@/lib/shop-data";
+import { findType, offeredOptions, specValues } from "@/lib/site-content";
+import { useSiteContent } from "@/components/site/site-content";
 import { formatPrice } from "@/lib/data";
 
 const PERKS = [
@@ -24,11 +26,12 @@ const PROMISES = [
 ];
 
 export function DealCard({ deal }: { deal: Deal }) {
-  const product = dealToProduct(deal);
+  const type = findType(useSiteContent().types, deal);
+  const product = dealToProduct(deal, type);
   return (
     <article className="group flex shrink-0 basis-[82%] snap-start flex-col rounded-2xl border border-border bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:basis-[calc((100%-1rem)/2)] lg:basis-[calc((100%-2rem)/3)] 2xl:basis-[calc((100%-3rem)/4)]">
       <Link href={`/product/${deal.id}`} className="relative block">
-        <ShopImage name={deal.image} className="aspect-[4/3] rounded-xl" />
+        <ShopImage src={deal.images[0]} className="aspect-[4/3] rounded-xl" />
         <span className="absolute top-2 left-2 rounded-md bg-navy px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">{deal.tag}</span>
         <span className="absolute top-2 right-2 rounded-md bg-ember px-2 py-0.5 text-[10px] font-bold text-white">{discountPct(deal)}% OFF</span>
       </Link>
@@ -39,8 +42,8 @@ export function DealCard({ deal }: { deal: Deal }) {
         <Star className="size-3.5 fill-amber-400 text-amber-400" /> {deal.rating.toFixed(1)} ({deal.reviews})
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {deal.spec.map((s) => (
-          <span key={s} className="rounded-md bg-cream px-2 py-0.5 text-[11px] font-medium text-navy ring-1 ring-peach">{s}</span>
+        {specValues(type, deal).slice(0, 3).map((s, i) => (
+          <span key={`${i}-${s}`} className="rounded-md bg-cream px-2 py-0.5 text-[11px] font-medium text-navy ring-1 ring-peach">{s}</span>
         ))}
       </div>
       <p className="mt-3 flex items-baseline gap-2">
@@ -49,8 +52,8 @@ export function DealCard({ deal }: { deal: Deal }) {
         <span className="rounded bg-emerald-50 px-1.5 text-[11px] font-bold text-emerald-700">{discountPct(deal)}% off</span>
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {[...deal.ram, ...deal.ssd].map((s) => (
-          <span key={s} className="rounded-full border border-navy/20 px-2 py-0.5 text-[11px] text-navy/80">{s}</span>
+        {offeredOptions(type, deal).flatMap((g) => g.values.map((v) => `${g.name}:${v}`)).map((key) => (
+          <span key={key} className="rounded-full border border-navy/20 px-2 py-0.5 text-[11px] text-navy/80">{key.slice(key.indexOf(":") + 1)}</span>
         ))}
       </div>
       <p className="mt-2 flex flex-wrap gap-x-3 text-[11px] font-medium">
@@ -106,6 +109,8 @@ export function DealRail({ deals, dark }: { deals: Deal[]; dark?: boolean }) {
 }
 
 export function Deals() {
+  const products = useSiteContent().products;
+  if (!products.length) return null;
   return (
     <section id="deals" className="container-x scroll-mt-28 py-10">
       <div className="grid gap-6 lg:grid-cols-[17rem_1fr] lg:items-center">
@@ -136,7 +141,7 @@ export function Deals() {
             ))}
           </ul>
         </Reveal>
-        <DealRail deals={DEALS} />
+        <DealRail deals={products} />
       </div>
     </section>
   );

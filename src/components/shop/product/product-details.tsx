@@ -4,6 +4,8 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, ChevronDown, Cpu, Gauge, HardDrive, Monitor, Power, Usb, Keyboard, Sparkles } from "lucide-react";
 import type { Deal } from "@/lib/shop-data";
+import { findType, offeredOptions } from "@/lib/site-content";
+import { useSiteContent } from "@/components/site/site-content";
 
 const SAMPLE = <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-800">SAMPLE REPORT</span>;
 
@@ -74,19 +76,23 @@ function TestedFor({ deal }: { deal: Deal }) {
 }
 
 function Specs({ deal }: { deal: Deal }) {
+  const type = findType(useSiteContent().types, deal);
   const tabs = {
-    Performance: [["Processor", deal.spec[0]], ["RAM options", deal.ram.join(" / ")], ["Storage options", deal.ssd.join(" / ") + " SSD"], ["Operating system", deal.spec[2]]],
-    Display: [["Screen", deal.spec[1]], ["Best for", deal.tag.toLowerCase()]],
+    Specifications: [
+      ...(type?.specs ?? []).filter((l) => deal.specs[l]?.trim()).map((l) => [l, deal.specs[l]]),
+      ...offeredOptions(type, deal).map((g) => [`${g.name} options`, g.values.join(" / ")]),
+      ["Best for", deal.tag.toLowerCase()],
+    ],
     "Warranty & condition": [["Warranty", "6 months"], ["Replacement", "15 days"], ["Condition", "Superb"], ["Quality check", "40 points"]],
   };
   type Tab = keyof typeof tabs;
-  const [tab, setTab] = useState<Tab>("Performance");
-  const icons = { Performance: Cpu, Display: Monitor, "Warranty & condition": HardDrive };
+  const [tab, setTab] = useState<Tab>("Specifications");
+  const icons = { Specifications: Cpu, "Warranty & condition": HardDrive };
 
   return (
     <section className="rounded-3xl bg-white p-6 ring-1 ring-border sm:p-8">
       <h2 className="text-xl font-extrabold text-navy">Technical specification</h2>
-      <div role="tablist" className="mt-5 grid grid-cols-3 border-b border-border">
+      <div role="tablist" className="mt-5 grid grid-cols-2 border-b border-border">
         {(Object.keys(tabs) as Tab[]).map((t) => {
           const Icon = icons[t];
           return (

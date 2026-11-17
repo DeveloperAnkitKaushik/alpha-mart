@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DealRail } from "@/components/shop/deals";
-import { DEALS } from "@/lib/shop-data";
+import { useSiteContent } from "@/components/site/site-content";
 
-const TABS = {
-  "Best Sellers": [...DEALS].sort((a, b) => b.reviews - a.reviews),
-  "New Arrivals": [...DEALS].reverse(),
-};
-type Tab = keyof typeof TABS;
+const TABS = ["Best Sellers", "New Arrivals"] as const;
+type Tab = (typeof TABS)[number];
 
 export function NewDrops() {
   const [tab, setTab] = useState<Tab>("Best Sellers");
+  const products = useSiteContent().products;
+  // Newest products are added at the end of the list.
+  const shown = useMemo(
+    () => (tab === "Best Sellers" ? [...products].sort((a, b) => b.reviews - a.reviews) : [...products].reverse()),
+    [products, tab],
+  );
+  if (!products.length) return null;
 
   return (
     <section className="container-x py-10">
@@ -21,7 +25,7 @@ export function NewDrops() {
           <h2 className="text-3xl leading-tight font-extrabold text-white">New Drops, Don&apos;t Miss Them!</h2>
           <p className="mt-1 text-2xl font-extrabold text-emerald-400">Grab Yours Now!</p>
           <ul role="tablist" className="mt-8 space-y-3">
-            {(Object.keys(TABS) as Tab[]).map((t) => (
+            {TABS.map((t) => (
               <li key={t}>
                 <button
                   type="button"
@@ -39,7 +43,7 @@ export function NewDrops() {
         </div>
         <AnimatePresence mode="wait">
           <motion.div key={tab} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.3 }} className="min-w-0">
-            <DealRail deals={TABS[tab]} dark />
+            <DealRail deals={shown} dark />
           </motion.div>
         </AnimatePresence>
       </div>

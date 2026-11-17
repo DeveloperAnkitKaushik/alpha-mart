@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
-import { SHOP_CATEGORIES } from "@/lib/shop-data";
+import { useSiteContent } from "@/components/site/site-content";
 
 const EXTRA_LINKS = [
   { href: "/requirement", label: "Send a requirement" },
@@ -12,6 +12,7 @@ const EXTRA_LINKS = [
 ];
 
 export function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const categories = useSiteContent().categories;
   return (
     <AnimatePresence>
       {open && (
@@ -40,8 +41,8 @@ export function MobileMenu({ open, onClose }: { open: boolean; onClose: () => vo
               </button>
             </div>
             <ul className="space-y-1">
-              {SHOP_CATEGORIES.map((c) => (
-                <li key={c.label}>
+              {categories.map((c) => (
+                <li key={c.slug}>
                   <Link href={`/collections/${c.slug}`} onClick={onClose} className="block rounded-lg px-3 py-2.5 font-medium text-navy transition hover:bg-cream">
                     {c.label}
                   </Link>

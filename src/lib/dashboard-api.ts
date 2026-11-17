@@ -16,12 +16,12 @@ import {
 } from "firebase/firestore";
 import { z } from "zod";
 import { getDb } from "./firebase";
-import { DEALS } from "./shop-data";
 
 export const STATUSES = ["new", "contacted", "quoted", "won", "lost"] as const;
 export type Status = (typeof STATUSES)[number];
 export type Kind = "lead" | "requirement" | "callback";
 type Coll = "leads" | "requirements";
+type NameOf = (productId: string) => string;
 
 export const CALLBACK_TITLE = "Callback request from footer";
 
@@ -60,7 +60,7 @@ const requirementDoc = z.object({
 const present = (pairs: [string, string | undefined][]) =>
   pairs.filter((p): p is [string, string] => Boolean(p[1]));
 
-function toItem(coll: Coll, d: QueryDocumentSnapshot): InboxItem | null {
+function toItem(coll: Coll, d: QueryDocumentSnapshot, nameOf: NameOf): InboxItem | null {
   // "estimate" fills a pending serverTimestamp so a just-created doc still has a time.
   const raw = d.data({ serverTimestamps: "estimate" });
   const common = { key: `${coll}/${d.id}`, id: d.id, coll };
@@ -68,7 +68,7 @@ function toItem(coll: Coll, d: QueryDocumentSnapshot): InboxItem | null {
     const r = leadDoc.safeParse(raw);
     if (!r.success) return null;
     const v = r.data;
-    const product = DEALS.find((p) => p.id === v.productId)?.name ?? v.productId;
+    const product = nameOf(v.productId);
     return {
       ...common,
       kind: "lead",
@@ -106,6 +106,7 @@ function toItem(coll: Coll, d: QueryDocumentSnapshot): InboxItem | null {
 
 function subscribeBoth(
   queries: Record<Coll, Query>,
+  nameOf: NameOf,
   onData: (items: InboxItem[]) => void,
   onError: (e: FirestoreError) => void,
 ): () => void {
@@ -118,7 +119,7 @@ function subscribeBoth(
     onSnapshot(
       queries[coll],
       (snap) => {
-        latest[coll] = snap.docs.flatMap((d) => toItem(coll, d) ?? []);
+        latest[coll] = snap.docs.flatMap((d) => toItem(coll, d, nameOf) ?? []);
         emit();
       },
       onError,
@@ -130,16 +131,16 @@ function subscribeBoth(
 // shortcut: staff inbox loads the newest 500 of each collection; add paging when volume grows past that.
 const STAFF_LIMIT = 500;
 
-export function subscribeInbox(onData: (items: InboxItem[]) => void, onError: (e: FirestoreError) => void) {
+export function subscribeInbox(nameOf: NameOf, onData: (items: InboxItem[]) => void, onError: (e: FirestoreError) => void) {
   const db = getDb();
   const q = (c: Coll) => query(collection(db, c), orderBy("createdAt", "desc"), limit(STAFF_LIMIT));
-  return subscribeBoth({ leads: q("leads"), requirements: q("requirements") }, onData, onError);
+  return subscribeBoth({ leads: q("leads"), requirements: q("requirements") }, nameOf, onData, onError);
 }
 
-export function subscribeMine(uid: string, onData: (items: InboxItem[]) => void, onError: (e: FirestoreError) => void) {
+export function subscribeMine(uid: string, nameOf: NameOf, onData: (items: InboxItem[]) => void, onError: (e: FirestoreError) => void) {
   const db = getDb();
   const q = (c: Coll) => query(collection(db, c), where("uid", "==", uid), limit(100));
-  return subscribeBoth({ leads: q("leads"), requirements: q("requirements") }, onData, onError);
+  return subscribeBoth({ leads: q("leads"), requirements: q("requirements") }, nameOf, onData, onError);
 }
 
 export async function isAdmin(uid: string): Promise<boolean> {

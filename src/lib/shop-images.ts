@@ -1,6 +1,14 @@
-import type { ShopImageKey } from "@/lib/shop-data";
+export type ShopImageKey =
+  | "laptop"
+  | "desktop-pc"
+  | "all-in-one-pc"
+  | "macbook"
+  | "gaming-laptop"
+  | "thinkpad"
+  | "dell-latitude"
+  | "hp-elitebook";
 
-// key -> open-licence photos in public/shop (credits in photo-credits.json, shown on /credits). Items fall back to an icon when empty.
+// key -> open-licence photos in public/shop (credits in photo-credits.json, shown on /credits).
 export const SHOP_IMAGES: Partial<Record<ShopImageKey, string[]>> = {
   "laptop": ["/shop/laptop-0.jpg", "/shop/laptop-1.jpg"],
   "desktop-pc": ["/shop/desktop-pc-0.jpg"],
@@ -11,3 +19,9 @@ export const SHOP_IMAGES: Partial<Record<ShopImageKey, string[]>> = {
   "dell-latitude": ["/shop/dell-latitude-0.jpg"],
   "hp-elitebook": ["/shop/hp-elitebook-0.jpg"],
 };
+
+// Photos the admin can pick without uploading.
+export const LIBRARY_IMAGES = [
+  ...Object.values(SHOP_IMAGES).flat(),
+  ...[1, 2, 3].flatMap((n) => [`/posters/banner-${n}-desktop.jpg`, `/posters/banner-${n}-mobile.jpg`]),
+];
