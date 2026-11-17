@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, fieldErrors, selectClass } from "@/components/site/field";
 import { createRequirement } from "@/lib/api";
 import { requirementSchema } from "@/lib/data";
-import { SHOP_CATEGORIES } from "@/lib/shop-data";
+import { useSiteContent } from "@/components/site/site-content";
 
 export function RequirementForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const categories = useSiteContent().categories;
   const mutation = useMutation({
     mutationFn: createRequirement,
     onError: () => toast.error("Could not post your requirement. Try again."),
@@ -65,7 +66,7 @@ export function RequirementForm() {
         <Field label="Category" error={errors.category}>
           <select name="category" defaultValue="" className={selectClass}>
             <option value="" disabled>Select…</option>
-            {SHOP_CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c.slug} value={c.slug}>{c.label}</option>
             ))}
           </select>

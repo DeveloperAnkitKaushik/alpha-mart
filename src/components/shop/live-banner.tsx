@@ -31,7 +31,7 @@ function PhoneMock() {
         className="relative rounded-[2.2rem] bg-zinc-900 p-2 shadow-2xl ring-1 ring-white/20"
       >
         <div className="relative aspect-[9/17] overflow-hidden rounded-[1.7rem] bg-zinc-800">
-          <ShopImage name="laptop" fit="cover" className="absolute inset-0 size-full" />
+          <ShopImage src="/shop/laptop-0.jpg" fit="cover" className="absolute inset-0 size-full" />
           <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent px-3 pt-3 pb-6 text-[10px] font-semibold text-white">
             <span className="flex items-center gap-1 rounded-full bg-rose-600 px-2 py-0.5">
               <span className="size-1.5 animate-pulse rounded-full bg-white" /> LIVE

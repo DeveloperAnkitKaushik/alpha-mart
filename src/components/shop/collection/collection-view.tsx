@@ -9,8 +9,10 @@ import { DealCard } from "@/components/shop/deals";
 import { FilterGroup } from "@/components/shop/collection/filter-group";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
-import { brandOf, COLLECTIONS, PRICE_BANDS, processorOf, typeOf } from "@/lib/collections";
-import { DEALS, discountPct, type Deal } from "@/lib/shop-data";
+import { brandOf, findCollection, PRICE_BANDS, processorOf } from "@/lib/collections";
+import { findType, type ProductType } from "@/lib/site-content";
+import { discountPct, type Deal } from "@/lib/shop-data";
+import { useSiteContent } from "@/components/site/site-content";
 import { formatPrice } from "@/lib/data";
 
 const PERKS = ["Free 6 Month Warranty", "40-Point Quality Check", "15 Day Replacement", "Pan-India Delivery", "GST Invoice", "Video Call Before You Buy", "Like-New Condition"];
@@ -23,14 +25,14 @@ const SORTS: Record<string, (a: Deal, b: Deal) => number> = {
   "Top rated": (a, b) => b.rating - a.rating,
 };
 
-const FACETS = [
-  { key: "type", title: "Product type", of: typeOf },
+const makeFacets = (types: ProductType[]) => [
+  { key: "type", title: "Product type", of: (d: Deal) => findType(types, d)?.name ?? "Other" },
   { key: "use", title: "Find by usage", of: (d: Deal) => d.tag.charAt(0) + d.tag.slice(1).toLowerCase() },
   { key: "brand", title: "Brand", of: brandOf },
   { key: "processor", title: "Processor", of: processorOf },
   { key: "price", title: "Price", of: (d: Deal) => PRICE_BANDS.find((b) => d.price >= b.min && d.price <= b.max)?.label ?? "" },
 ] as const;
-type FacetKey = (typeof FACETS)[number]["key"];
+type FacetKey = ReturnType<typeof makeFacets>[number]["key"];
 
 const count = (deals: Deal[], of: (d: Deal) => string) =>
   Object.entries(deals.reduce<Record<string, number>>((m, d) => ({ ...m, [of(d)]: (m[of(d)] ?? 0) + 1 }), {})).map(([value, c]) => ({ value, count: c }));
@@ -47,22 +49,24 @@ export function CollectionView({ slug }: { slug: string }) {
 }
 
 function CollectionResults({ slug, params }: { slug: string; params: URLSearchParams }) {
-  const collection = COLLECTIONS[slug];
+  const content = useSiteContent();
+  const facets = useMemo(() => makeFacets(content.types), [content.types]);
+  const collection = useMemo(() => findCollection(content, slug), [content, slug]);
   const [sort, setSort] = useState("Best selling");
   const [picked, setPicked] = useState<Record<FacetKey, string[]>>(() => ({ type: [], use: [], brand: params.getAll("brand"), processor: [], price: [] }));
   const [cap, setCap] = useState({ min: num(params.get("min"), 0), max: num(params.get("max"), Infinity) });
   const [showFilters, setShowFilters] = useState(false);
   const [term, setTerm] = useState(params.get("q")?.trim() ?? "");
 
-  const base = useMemo(() => (collection ? DEALS.filter(collection.match) : []), [collection]);
+  const base = useMemo(() => collection?.deals ?? [], [collection]);
   const results = useMemo(
     () =>
       base
-        .filter((d) => !term || `${d.name} ${d.spec.join(" ")} ${d.tag}`.toLowerCase().includes(term.toLowerCase()))
+        .filter((d) => !term || `${d.name} ${Object.values(d.specs).join(" ")} ${d.tag}`.toLowerCase().includes(term.toLowerCase()))
         .filter((d) => d.price >= cap.min && d.price <= cap.max)
-        .filter((d) => FACETS.every((f) => picked[f.key].length === 0 || picked[f.key].includes(f.of(d))))
+        .filter((d) => facets.every((f) => picked[f.key].length === 0 || picked[f.key].includes(f.of(d))))
         .sort(SORTS[sort]),
-    [base, term, cap, picked, sort],
+    [base, term, cap, picked, sort, facets],
   );
 
   if (!collection) {
@@ -77,7 +81,7 @@ function CollectionResults({ slug, params }: { slug: string; params: URLSearchPa
   const toggle = (key: FacetKey, value: string) =>
     setPicked((p) => ({ ...p, [key]: p[key].includes(value) ? p[key].filter((v) => v !== value) : [...p[key], value] }));
   const capLabel = cap.max !== Infinity ? `Under ${formatPrice(cap.max + 1)}` : cap.min > 0 ? `Above ${formatPrice(cap.min)}` : null;
-  const chips = FACETS.flatMap((f) => picked[f.key].map((v) => ({ key: f.key, v })));
+  const chips = facets.flatMap((f) => picked[f.key].map((v) => ({ key: f.key, v })));
   const clearAll = () => {
     setPicked({ type: [], use: [], brand: [], processor: [], price: [] });
     setCap({ min: 0, max: Infinity });
@@ -138,7 +142,7 @@ function CollectionResults({ slug, params }: { slug: string; params: URLSearchPa
                 <button type="button" onClick={clearAll} className="text-xs font-semibold text-ember hover:underline">Clear all</button>
               )}
             </div>
-            {FACETS.map((f, i) => (
+            {facets.map((f, i) => (
               <FilterGroup key={f.key} title={f.title} options={count(base, f.of)} selected={picked[f.key]} onToggle={(v) => toggle(f.key, v)} defaultOpen={i === 0} />
             ))}
           </aside>

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, Home, Laptop } from "lucide-react";
 import { stateBtn } from "@/components/site/state-styles";
-import { SHOP_CATEGORIES } from "@/lib/shop-data";
+import { getSiteContent } from "@/lib/site-content-server";
 
 export const metadata = { title: "Page not found — Alpha Mart" };
 
-export default function NotFound() {
+export default async function NotFound() {
   return (
     <div className="bg-cream">
       <div className="container-x flex min-h-[65vh] flex-col items-center justify-center py-16 text-center">
@@ -32,7 +32,7 @@ export default function NotFound() {
           </Link>
         </div>
         <ul className="mt-10 flex flex-wrap justify-center gap-2">
-          {SHOP_CATEGORIES.map((c) => (
+          {(await getSiteContent()).categories.map((c) => (
             <li key={c.slug}>
               <Link href={`/collections/${c.slug}`} className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-navy ring-1 ring-border transition hover:-translate-y-0.5 hover:ring-navy">
                 {c.label}

@@ -1,41 +1,48 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Leaf, MapPinned, Smile, Star } from "lucide-react";
+import { Leaf, MapPinned, Smile, Star, Truck, Users, type LucideIcon } from "lucide-react";
 import CountUp from "@/components/CountUp";
+import { useSiteContent } from "@/components/site/site-content";
+import { cn } from "@/lib/utils";
+import type { Stat } from "@/lib/site-content";
 
-const STATS = [
-  { icon: Smile, to: 12500, suffix: "+", label: "Devices supplied", tone: "from-orange-400 to-amber-300" },
-  { icon: MapPinned, to: 800, suffix: "+", label: "Pincodes served", tone: "from-sky-500 to-cyan-300" },
-  { icon: Leaf, to: 140, suffix: " t", label: "CO₂ saved", tone: "from-emerald-500 to-lime-300" },
-  { icon: Star, to: 4.7, suffix: " / 5", label: "Customer rating", decimals: 1, tone: "from-violet-500 to-fuchsia-300" },
-];
+export const STAT_ICON: Record<Stat["icon"], LucideIcon> = { smile: Smile, map: MapPinned, leaf: Leaf, star: Star, users: Users, truck: Truck };
+const TONES = ["from-orange-400 to-amber-300", "from-sky-500 to-cyan-300", "from-emerald-500 to-lime-300", "from-violet-500 to-fuchsia-300"];
+const COLS = ["", "lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3", "lg:grid-cols-4"];
 
 export function TrustStrip() {
+  const { stats, banners } = useSiteContent();
+  if (!stats.length) return null;
+  // The strip overlaps the hero; with no banner showing it sits in normal flow.
+  const overlapHero = banners.some((b) => b.enabled);
   return (
-    <div className="container-x relative z-10 -mt-10">
+    <div className={cn("container-x relative z-10", overlapHero ? "-mt-10" : "mt-6")}>
       <motion.dl
         initial={{ opacity: 0, y: 24 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border shadow-xl ring-1 ring-black/5 lg:grid-cols-4"
+        className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border shadow-xl ring-1 ring-black/5", COLS[stats.length])}
       >
-        {STATS.map((s) => (
-          <div key={s.label} className="group flex items-center gap-4 bg-white px-5 py-5 transition duration-300 hover:bg-cream sm:px-7">
-            <span
-              className={`grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-md transition duration-300 group-hover:scale-110 group-hover:-rotate-6 ${s.tone}`}
-            >
-              <s.icon className="size-6" />
-            </span>
-            <div>
-              <dd className="text-2xl leading-none font-extrabold tracking-tight text-navy tabular-nums sm:text-3xl">
-                <CountUp to={s.to} suffix={s.suffix} decimals={s.decimals ?? 0} separator="," duration={1.6} />
-              </dd>
-              <dt className="mt-1 text-xs font-medium text-muted-foreground">{s.label}</dt>
+        {stats.map((s, i) => {
+          const Icon = STAT_ICON[s.icon];
+          return (
+            <div key={i} className="group flex items-center gap-4 bg-white px-5 py-5 transition duration-300 hover:bg-cream sm:px-7">
+              <span
+                className={`grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-md transition duration-300 group-hover:scale-110 group-hover:-rotate-6 ${TONES[i % TONES.length]}`}
+              >
+                <Icon className="size-6" />
+              </span>
+              <div>
+                <dd className="text-2xl leading-none font-extrabold tracking-tight text-navy tabular-nums sm:text-3xl">
+                  <CountUp to={s.value} suffix={s.suffix} decimals={s.decimals} separator="," duration={1.6} />
+                </dd>
+                <dt className="mt-1 text-xs font-medium text-muted-foreground">{s.label}</dt>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </motion.dl>
     </div>
   );

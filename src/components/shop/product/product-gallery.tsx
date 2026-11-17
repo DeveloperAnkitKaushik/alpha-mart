@@ -5,7 +5,6 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, FileText, RotateCcw, ShieldCheck, Video } from "lucide-react";
 import { ShopImage } from "@/components/shop/shop-image";
-import { SHOP_IMAGES } from "@/lib/shop-images";
 import type { Deal } from "@/lib/shop-data";
 
 const STRIP = [
@@ -20,7 +19,7 @@ const INFO = [
 ];
 
 export function ProductGallery({ deal }: { deal: Deal }) {
-  const photos = SHOP_IMAGES[deal.image] ?? [];
+  const photos = deal.images;
   const [active, setActive] = useState(0);
 
   return (
@@ -29,7 +28,7 @@ export function ProductGallery({ deal }: { deal: Deal }) {
         {photos.length > 1 && (
           <ul className="order-2 flex gap-2 sm:order-1 sm:flex-col">
             {photos.map((src, i) => (
-              <li key={src}>
+              <li key={`${i}-${src}`}>
                 <button
                   type="button"
                   aria-label={`Show photo ${i + 1}`}
@@ -60,7 +59,7 @@ export function ProductGallery({ deal }: { deal: Deal }) {
                 {photos[active] ? (
                   <Image src={photos[active]} alt={deal.name} fill priority unoptimized sizes="(min-width: 1024px) 45vw, 100vw" className="object-contain" />
                 ) : (
-                  <ShopImage name={deal.image} className="size-full" />
+                  <ShopImage className="size-full" />
                 )}
               </motion.div>
             </AnimatePresence>

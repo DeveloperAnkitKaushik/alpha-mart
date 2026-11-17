@@ -8,8 +8,8 @@ import { LeadDialog } from "@/components/site/lead-dialog";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { formatPrice } from "@/lib/data";
 import { configPrice, dealToProduct, discountPct, type Deal } from "@/lib/shop-data";
-
-const CODE = "ALPHA500";
+import { findType, offeredOptions } from "@/lib/site-content";
+import { useSiteContent } from "@/components/site/site-content";
 
 function Options({ label, values, value, onChange }: { label: string; values: string[]; value: number; onChange: (i: number) => void }) {
   return (
@@ -36,18 +36,22 @@ function Options({ label, values, value, onChange }: { label: string; values: st
 }
 
 export function ProductBuyBox({ deal }: { deal: Deal }) {
-  const [ram, setRam] = useState(0);
-  const [ssd, setSsd] = useState(0);
+  const { types, sale } = useSiteContent();
+  const type = findType(types, deal);
+  const groups = offeredOptions(type, deal);
+  // One picked index per option group; the cheapest value is the default.
+  const [picks, setPicks] = useState<number[]>(() => groups.map(() => 0));
   const [pinMsg, setPinMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const price = configPrice(deal, ram, ssd);
+  const price = configPrice(deal, groups, picks);
   const mrp = deal.mrp;
-  const config = `${deal.ram[ram]} RAM · ${deal.ssd[ssd]} SSD`;
-  const product = { ...dealToProduct(deal), name: `${deal.name} (${config})`, priceMin: price, priceMax: price };
+  const config = groups.map((g, i) => `${g.values[picks[i] ?? 0]} ${g.name}`).join(" · ");
+  const product = { ...dealToProduct(deal, type), name: config ? `${deal.name} (${config})` : deal.name, priceMin: price, priceMax: price };
+  const code = sale.enabled ? sale.code : "";
 
   const copy = () => {
-    navigator.clipboard?.writeText(CODE).catch(() => undefined);
-    toast.success(`Code ${CODE} copied`, { description: "Mention it when you enquire." });
+    navigator.clipboard?.writeText(code).catch(() => undefined);
+    toast.success(`Code ${code} copied`, { description: "Mention it when you enquire." });
   };
   const checkPin = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -75,29 +79,35 @@ export function ProductBuyBox({ deal }: { deal: Deal }) {
 
       <div className="mt-6 space-y-4 rounded-2xl bg-white p-5 ring-1 ring-border">
         <p className="text-sm font-bold text-navy">More configurations available</p>
-        <Options label="RAM capacity" values={deal.ram} value={ram} onChange={setRam} />
-        <Options label="Storage capacity" values={deal.ssd} value={ssd} onChange={setSsd} />
+        {groups.map((g, i) => (
+          <Options key={g.name} label={g.name} values={g.values} value={picks[i] ?? 0} onChange={(v) => setPicks((p) => groups.map((_, j) => (j === i ? v : (p[j] ?? 0))))} />
+        ))}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <p className="rounded-xl bg-cream px-3 py-2 ring-1 ring-peach"><span className="block text-xs text-muted-foreground">Warranty</span><span className="font-semibold">Free 6 month</span></p>
           <p className="rounded-xl bg-cream px-3 py-2 ring-1 ring-peach"><span className="block text-xs text-muted-foreground">Condition</span><span className="font-semibold">Superb</span></p>
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl ring-1 ring-amber-300">
-        <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-amber-100 to-peach px-4 py-3">
-          <p className="flex items-center gap-2 text-sm font-extrabold text-navy">
-            <Sparkles className="size-4 text-ember" /> Mega Refurb Sale · up to 70% off
-          </p>
-          <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-[10px] font-bold text-white">LIVE</span>
+      {sale.enabled && (
+        <div className="mt-4 overflow-hidden rounded-2xl ring-1 ring-amber-300">
+          <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-amber-100 to-peach px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-extrabold text-navy">
+              <Sparkles className="size-4 text-ember" /> {sale.title}
+              {sale.discount && ` · up to ${sale.discount.toLowerCase()}`}
+            </p>
+            <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-[10px] font-bold text-white">LIVE</span>
+          </div>
+          {code && (
+            <div className="flex items-center justify-between gap-3 bg-navy px-4 py-3 text-white">
+              <span className="text-xs">Use code</span>
+              <button type="button" onClick={copy} className="flex items-center gap-2 rounded-lg border border-dashed border-white/60 px-3 py-1 text-sm font-bold tracking-widest transition hover:bg-white/10">
+                {code} <Copy className="size-3.5" />
+              </button>
+              <span className="text-xs text-white/70">Extra ₹500 off on enquiry</span>
+            </div>
+          )}
         </div>
-        <div className="flex items-center justify-between gap-3 bg-navy px-4 py-3 text-white">
-          <span className="text-xs">Use code</span>
-          <button type="button" onClick={copy} className="flex items-center gap-2 rounded-lg border border-dashed border-white/60 px-3 py-1 text-sm font-bold tracking-widest transition hover:bg-white/10">
-            {CODE} <Copy className="size-3.5" />
-          </button>
-          <span className="text-xs text-white/70">Extra ₹500 off on enquiry</span>
-        </div>
-      </div>
+      )}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <LeadDialog product={product} className="h-12 rounded-xl bg-navy text-base hover:bg-navy-deep" />

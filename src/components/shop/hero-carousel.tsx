@@ -2,27 +2,31 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-
-// shortcut: demo banners supplied by the owner (not ours to publish), replace with Alpha Mart artwork before going live.
-const POSTERS = [1, 2, 3].map((n) => ({ id: `banner-${n}`, href: "#deals", alt: `Sale banner ${n}` }));
+import { useSiteContent } from "@/components/site/site-content";
 
 const INTERVAL_MS = 5500;
 
 export function HeroCarousel() {
+  const all = useSiteContent().banners;
+  const posters = useMemo(() => all.filter((b) => b.enabled), [all]);
+  const count = posters.length;
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
-  const go = useCallback((n: number) => setI((n + POSTERS.length) % POSTERS.length), []);
+  const go = useCallback((n: number) => setI((n + count) % count), [count]);
 
   useEffect(() => {
-    if (paused) return;
-    const id = setInterval(() => setI((n) => (n + 1) % POSTERS.length), INTERVAL_MS);
+    if (paused || count < 2) return;
+    const id = setInterval(() => setI((n) => (n + 1) % count), INTERVAL_MS);
     return () => clearInterval(id);
-  }, [paused, i]);
+  }, [paused, i, count]);
 
-  const p = POSTERS[i];
+  if (!count) return null;
+  // The banner list can shrink while the carousel is showing (admin preview).
+  const at = i % count;
+  const p = posters[at];
   const external = p.href.startsWith("http");
 
   return (
@@ -43,13 +47,13 @@ export function HeroCarousel() {
           className="absolute inset-0"
         >
           <Link href={p.href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="relative block size-full">
-            <Image src={`/posters/${p.id}-mobile.jpg`} alt={p.alt} fill priority unoptimized sizes="100vw" className="object-cover md:hidden" />
-            <Image src={`/posters/${p.id}-desktop.jpg`} alt="" aria-hidden fill priority unoptimized sizes="100vw" className="hidden object-cover md:block" />
+            <Image src={p.mobile || p.desktop} alt={p.alt} fill priority unoptimized sizes="100vw" className="object-cover md:hidden" />
+            <Image src={p.desktop} alt="" aria-hidden fill priority unoptimized sizes="100vw" className="hidden object-cover md:block" />
           </Link>
         </motion.div>
       </AnimatePresence>
 
-      {(
+      {count > 1 && (
         [
           { n: -1, Icon: ChevronLeft, label: "Previous poster", pos: "right-16" },
           { n: 1, Icon: ChevronRight, label: "Next poster", pos: "right-5" },
@@ -59,24 +63,24 @@ export function HeroCarousel() {
           key={label}
           type="button"
           aria-label={label}
-          onClick={() => go(i + n)}
+          onClick={() => go(at + n)}
           className={`absolute bottom-14 hidden size-10 place-items-center rounded-full bg-white/20 text-white backdrop-blur transition hover:bg-white/40 md:grid ${pos}`}
         >
           <Icon className="size-5" />
         </button>
       ))}
-      <div className="absolute inset-x-0 bottom-14 flex justify-center gap-2">
-        {POSTERS.map((d, n) => (
+      {count > 1 && <div className="absolute inset-x-0 bottom-14 flex justify-center gap-2">
+        {posters.map((d, n) => (
           <button
             key={d.id}
             type="button"
             aria-label={`Go to poster ${n + 1}`}
-            aria-current={n === i}
+            aria-current={n === at}
             onClick={() => go(n)}
-            className={`h-2 rounded-full transition-all ${n === i ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80"}`}
+            className={`h-2 rounded-full transition-all ${n === at ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80"}`}
           />
         ))}
-      </div>
+      </div>}
     </section>
   );
 }

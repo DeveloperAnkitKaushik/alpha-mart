@@ -2,7 +2,10 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { RotateCw, ServerCrash } from "lucide-react";
+import { LayoutGrid, LineChart, RotateCw, ServerCrash } from "lucide-react";
+import { Tabs } from "@base-ui/react/tabs";
+import { TabBar } from "./tab-bar";
+import { ItemsView } from "./items/items-view";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
 import { DashboardSkeleton } from "./dashboard-skeleton";
@@ -18,7 +21,27 @@ import { useInbox, useNow } from "./use-inbox";
 
 const INITIAL_FILTER: InboxFilter = { term: "", kind: "all", status: "all", sort: "newest" };
 
+const TOP_TABS = [
+  { value: "dashboard", label: "Dashboard", icon: LineChart },
+  { value: "items", label: "Items", icon: LayoutGrid },
+];
+
+// Dashboard = enquiry numbers and inbox; Items = everything shown on the storefront.
 export function StaffView() {
+  return (
+    <Tabs.Root defaultValue="dashboard">
+      <TabBar label="Admin sections" tabs={TOP_TABS} />
+      <Tabs.Panel value="dashboard" className="mt-6 outline-none">
+        <Inbox />
+      </Tabs.Panel>
+      <Tabs.Panel value="items" className="mt-6 outline-none">
+        <ItemsView />
+      </Tabs.Panel>
+    </Tabs.Root>
+  );
+}
+
+function Inbox() {
   const { items, error, retry } = useInbox("staff");
   const now = useNow();
   const [filter, setFilter] = useState(INITIAL_FILTER);

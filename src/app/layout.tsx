@@ -5,6 +5,8 @@ import { Providers } from "@/components/site/providers";
 import { SiteHeader } from "@/components/site/site-header";
 import { Footer } from "@/components/site/footer";
 import { Toaster } from "@/components/ui/sonner";
+import { SiteContentProvider } from "@/components/site/site-content";
+import { getSiteContent } from "@/lib/site-content-server";
 
 const urbanist = Urbanist({
   variable: "--font-urbanist",
@@ -26,7 +28,7 @@ export const metadata: Metadata = {
   description: "Quality-tested refurbished laptops, desktops and MacBooks with a 6 month warranty. Enquire or chat on WhatsApp for the best price.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
@@ -34,10 +36,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <Providers>
-          <SiteHeader />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <Toaster theme="light" />
+          <SiteContentProvider content={await getSiteContent()}>
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <Toaster theme="light" />
+          </SiteContentProvider>
         </Providers>
       </body>
     </html>

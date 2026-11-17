@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, PlugZap, RotateCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { LogOut, PlugZap, RotateCw, ShieldAlert } from "lucide-react";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
 import { DashboardSkeleton } from "./dashboard-skeleton";
@@ -17,12 +17,7 @@ function Header({ staff }: { staff: boolean }) {
   return (
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
-        {staff && (
-          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-navy px-3 py-1 text-xs font-bold text-white">
-            <ShieldCheck className="size-3.5" aria-hidden /> Staff
-          </p>
-        )}
-        <h1 className="text-3xl font-extrabold tracking-tight text-navy-deep sm:text-4xl">{staff ? "Leads dashboard" : "My enquiries"}</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-navy-deep sm:text-4xl">{staff ? "Admin dashboard" : "My enquiries"}</h1>
         {email && <p className="mt-1 text-sm text-muted-foreground">Signed in as {email}</p>}
       </div>
       <button
