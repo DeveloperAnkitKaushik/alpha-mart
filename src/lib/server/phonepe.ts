@@ -18,7 +18,7 @@ const tokenSchema = z.object({ access_token: z.string(), expires_at: z.number() 
 const paySchema = z.object({ redirectUrl: z.string() });
 const statusSchema = z.object({
   state: z.string(),
-  paymentDetails: z.array(z.object({ transactionId: z.string() })).optional(),
+  paymentDetails: z.array(z.object({ transactionId: z.string(), state: z.string() })).optional(),
 });
 
 let token: { value: string; expiresAt: number } | null = null;
@@ -73,7 +73,9 @@ export async function getPaymentState(
     await pg(`/checkout/v2/order/${encodeURIComponent(merchantOrderId)}/status`),
   );
   const state: PgState = data.state === "COMPLETED" || data.state === "FAILED" ? data.state : "PENDING";
-  return { state, transactionId: data.paymentDetails?.[0]?.transactionId ?? null };
+  const attempts = data.paymentDetails ?? [];
+  const attempt = (state === "COMPLETED" && attempts.find((a) => a.state === "COMPLETED")) || attempts.at(-1);
+  return { state, transactionId: attempt?.transactionId ?? null };
 }
 
 export function isValidWebhookAuth(header: string | null): boolean {

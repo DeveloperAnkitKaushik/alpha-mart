@@ -55,10 +55,21 @@ describe("phonepe client", () => {
   it("maps COMPLETED status and returns the transaction id", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(json({ state: "COMPLETED", paymentDetails: [{ transactionId: "t1" }] })),
+      vi.fn().mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(json({ state: "COMPLETED", paymentDetails: [{ transactionId: "t1", state: "COMPLETED" }] })),
     );
     const { getPaymentState } = await load();
     expect(await getPaymentState("o1")).toEqual({ state: "COMPLETED", transactionId: "t1" });
+  });
+
+  it("returns the completed attempt's transaction id when an earlier attempt failed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(
+        json({ state: "COMPLETED", paymentDetails: [{ transactionId: "t1", state: "FAILED" }, { transactionId: "t2", state: "COMPLETED" }] }),
+      ),
+    );
+    const { getPaymentState } = await load();
+    expect(await getPaymentState("o1")).toEqual({ state: "COMPLETED", transactionId: "t2" });
   });
 
   it("throws on non-2xx from create", async () => {
