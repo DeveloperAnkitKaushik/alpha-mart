@@ -11,10 +11,22 @@ import { stateBtn } from "@/components/site/state-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-store";
 import { formatPrice } from "@/lib/data";
+import { useCart } from "@/lib/store/cart-store";
 import { getMyOrder, type OrderView } from "@/lib/store/checkout-actions";
+import type { OrderStatus } from "@/lib/store/order-state";
+import type { CartLine } from "@/lib/store/schemas";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 2 * 60 * 1000;
+const PAID: OrderStatus[] = ["paid", "packed", "shipped", "delivered"];
+
+const lineKey = (l: CartLine) => `${l.productId}|${JSON.stringify(Object.entries(l.options).sort())}|${l.qty}`;
+
+// Clears the cart only while it still holds exactly what this order bought, so opening an old order never wipes a newer cart.
+function clearOrderedCart(items: CartLine[]) {
+  const cart = useCart.getState().lines.map(lineKey).sort().join();
+  if (cart && cart === items.map(lineKey).sort().join()) useCart.getState().clear();
+}
 
 function Summary({ order }: { order: OrderView }) {
   const { address: a } = order;
@@ -84,7 +96,9 @@ function Detail({ uid, orderId }: { uid: string; orderId: string }) {
     queryFn: async () => {
       const user = useAuth.getState().user;
       if (!user) throw new Error("signed out");
-      return getMyOrder(await user.getIdToken(), orderId);
+      const r = await getMyOrder(await user.getIdToken(), orderId);
+      if (r.ok && PAID.includes(r.order.status)) clearOrderedCart(r.order.items);
+      return r;
     },
     refetchInterval: (query) => {
       const d = query.state.data;
@@ -141,6 +155,11 @@ function Detail({ uid, orderId }: { uid: string; orderId: string }) {
             </>
           )}
         </p>
+      )}
+      {order.checkoutUrl && (
+        <a href={order.checkoutUrl} className={stateBtn.primary}>
+          Complete payment
+        </a>
       )}
       <Summary order={order} />
     </div>

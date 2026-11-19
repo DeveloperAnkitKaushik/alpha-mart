@@ -32,7 +32,6 @@ function Checkout({ uid }: { uid: string }) {
       await saveProfile(uid, address).catch(() => {});
       const order = await createOrder(await user.getIdToken(), lines, code, address);
       if (order.ok) {
-        useCart.getState().clear();
         window.location.href = order.checkoutUrl;
         return;
       }

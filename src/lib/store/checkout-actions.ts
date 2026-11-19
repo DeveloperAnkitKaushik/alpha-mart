@@ -16,6 +16,18 @@ type Failure = { ok: false; error: string };
 const linesSchema = z.array(cartLineSchema).min(1).max(20);
 const codeSchema = couponCodeSchema.nullable();
 const SESSION_EXPIRED: Failure = { ok: false, error: "Your session expired. Sign in again." };
+const STORE_OFF: Failure = { ok: false, error: "The store isn't taking online orders right now." };
+const SWEEP_EVERY_MS = 60_000;
+let lastSweep = 0;
+
+const storeOff = () => process.env.STORE_ENABLED !== "true";
+
+// Releases abandoned holds even when no one can reach createOrder because the product shows sold out.
+async function sweepThrottled() {
+  if (Date.now() - lastSweep < SWEEP_EVERY_MS) return;
+  lastSweep = Date.now();
+  await sweepExpired().catch(() => undefined);
+}
 
 function parseCart(lines: unknown, code: unknown): { ok: true; lines: CartLine[]; code: string | null } | Failure {
   const l = linesSchema.safeParse(lines);
@@ -30,7 +42,9 @@ export async function previewTotals(
   lines: unknown,
   code: unknown,
 ): Promise<{ ok: true; subtotal: number; discount: number; total: number; lines: PricedLine[] } | Failure> {
+  if (storeOff()) return STORE_OFF;
   try {
+    await sweepThrottled();
     const uid = idToken ? await requireUser(idToken) : null;
     const cart = parseCart(lines, code);
     if (!cart.ok) return cart;
@@ -55,6 +69,7 @@ export async function createOrder(
   code: unknown,
   address: unknown,
 ): Promise<{ ok: true; checkoutUrl: string } | Failure> {
+  if (storeOff()) return STORE_OFF;
   try {
     const uid = await requireUser(idToken);
     const cart = parseCart(lines, code);
@@ -75,17 +90,20 @@ export async function createOrder(
     });
     if (!order.ok) return order;
 
+    let checkoutUrl: string;
     try {
-      const { checkoutUrl } = await createPayment({
+      ({ checkoutUrl } = await createPayment({
         merchantOrderId: order.orderId,
         amount: order.total,
         redirectUrl: `${serverEnv().SITE_URL}/orders/${order.orderId}`,
-      });
-      return { ok: true, checkoutUrl };
+      }));
     } catch {
       await settleOrder(order.orderId, { state: "FAILED", transactionId: null });
       return { ok: false, error: "PhonePe is not responding. Nothing was charged, try again." };
     }
+    // Saved so the order page can resume the payment; the customer is redirected even if this write fails.
+    await adminDb().doc(`orders/${order.orderId}`).update({ checkoutUrl }).catch(() => undefined);
+    return { ok: true, checkoutUrl };
   } catch (e) {
     if (e instanceof AuthError) return SESSION_EXPIRED;
     throw e;
@@ -104,13 +122,13 @@ export async function getMyOrder(
     if (!snap.exists) return { ok: false, error: "not_found" };
     let { uid: owner, ...order } = snap.data() as OrderDoc;
     if (owner !== uid && !(await adminDb().doc(`admins/${uid}`).get()).exists) return { ok: false, error: "not_found" };
-    if (order.status === "pending_payment") {
+    if (order.status === "pending_payment" || order.status === "expired") {
       // PhonePe being unreachable must not hide the order; the page keeps polling.
       await reconcileOrder(orderId).catch(() => undefined);
       snap = await ref.get();
       ({ uid: owner, ...order } = snap.data() as OrderDoc);
     }
-    return { ok: true, order: toOrderView(orderId, order) };
+    return { ok: true, order: toOrderView(orderId, order, owner === uid) };
   } catch (e) {
     if (e instanceof AuthError) return { ok: false, error: "auth" };
     throw e;

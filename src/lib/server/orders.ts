@@ -20,19 +20,24 @@ export type OrderDoc = {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   trackingNote: string;
+  checkoutUrl?: string;
 };
 
-export type OrderView = Omit<OrderDoc, "uid" | "reservedUntil" | "createdAt" | "updatedAt"> & {
+export type OrderView = Omit<OrderDoc, "uid" | "reservedUntil" | "createdAt" | "updatedAt" | "checkoutUrl"> & {
   id: string;
   reservedUntil: string;
   createdAt: string;
   updatedAt: string;
+  checkoutUrl: string | null;
 };
 
-export function toOrderView(id: string, order: Omit<OrderDoc, "uid">): OrderView {
+// The PhonePe link goes only to the order's owner, and only while the hold is live.
+export function toOrderView(id: string, { checkoutUrl, ...order }: Omit<OrderDoc, "uid">, isOwner = false): OrderView {
+  const payable = isOwner && order.status === "pending_payment" && order.reservedUntil.toMillis() > Date.now();
   return {
     ...order,
     id,
+    checkoutUrl: payable ? (checkoutUrl ?? null) : null,
     reservedUntil: order.reservedUntil.toDate().toISOString(),
     createdAt: order.createdAt.toDate().toISOString(),
     updatedAt: order.updatedAt.toDate().toISOString(),
