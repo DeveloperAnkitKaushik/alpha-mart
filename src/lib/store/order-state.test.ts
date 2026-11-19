@@ -41,8 +41,8 @@ describe("paymentEffect", () => {
 });
 
 describe("staffEffect", () => {
-  it("allows paid to packed to shipped to delivered", () => {
-    for (const [a, b] of [["paid", "packed"], ["packed", "shipped"], ["shipped", "delivered"]] as const) {
+  it("allows paid to packed to shipped to delivered, and a late-paid needs_attention order to be packed", () => {
+    for (const [a, b] of [["paid", "packed"], ["packed", "shipped"], ["shipped", "delivered"], ["needs_attention", "packed"]] as const) {
       expect(staffEffect(a, b)).toEqual({ ok: true, restock: false });
     }
   });
