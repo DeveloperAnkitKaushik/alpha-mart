@@ -18,7 +18,7 @@ const tokenSchema = z.object({ access_token: z.string(), expires_at: z.number() 
 const paySchema = z.object({ redirectUrl: z.string() });
 const statusSchema = z.object({
   state: z.string(),
-  paymentDetails: z.array(z.object({ transactionId: z.string(), state: z.string() })).optional(),
+  paymentDetails: z.array(z.object({ transactionId: z.string().optional(), state: z.string().optional() })).optional(),
 });
 
 let token: { value: string; expiresAt: number } | null = null;
@@ -53,7 +53,7 @@ async function pg(path: string, init: RequestInit = {}): Promise<unknown> {
     headers: { "Content-Type": "application/json", Authorization: `O-Bearer ${await accessToken()}` },
   });
   const body: unknown = await res.json().catch(() => null);
-  if (res.status === 404 || notFoundSchema.safeParse(body).success) throw new PaymentNotFoundError(path);
+  if (notFoundSchema.safeParse(body).success) throw new PaymentNotFoundError(path);
   if (!res.ok) throw new Error(`PhonePe request failed: ${res.status}`);
   return body;
 }
@@ -81,7 +81,7 @@ export async function getPaymentState(
   );
   const state: PgState = data.state === "COMPLETED" || data.state === "FAILED" ? data.state : "PENDING";
   const attempts = data.paymentDetails ?? [];
-  const attempt = (state === "COMPLETED" && attempts.find((a) => a.state === "COMPLETED")) || attempts.at(-1);
+  const attempt = state === "COMPLETED" ? attempts.find((a) => a.state === "COMPLETED") : attempts.at(-1);
   return { state, transactionId: attempt?.transactionId ?? null };
 }
 

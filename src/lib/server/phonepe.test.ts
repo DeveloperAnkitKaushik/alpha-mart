@@ -85,6 +85,23 @@ describe("phonepe client", () => {
     await expect(getPaymentState("o1")).rejects.toBeInstanceOf(PaymentNotFoundError);
   });
 
+  it("accepts a COMPLETED status whose attempts omit state, with no transaction id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(json({ state: "COMPLETED", paymentDetails: [{ transactionId: "t1" }] })),
+    );
+    const { getPaymentState } = await load();
+    expect(await getPaymentState("o1")).toEqual({ state: "COMPLETED", transactionId: null });
+  });
+
+  it("treats a bare 404 as an error, not as an order PhonePe never saw", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => (url.includes("oauth/token") ? tokenRes() : json({}, 404))));
+    const { getPaymentState, PaymentNotFoundError } = await load();
+    const err = await getPaymentState("o1").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PaymentNotFoundError);
+  });
+
   it("throws on non-2xx from create", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(json({}, 400)));
     const { createPayment } = await load();
