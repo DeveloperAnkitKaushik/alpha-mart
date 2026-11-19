@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { Copy, Sparkles, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
+import { AddToCart } from "@/components/store/add-to-cart";
+import { FavoriteButton } from "@/components/store/favorite-button";
 import { LeadDialog } from "@/components/site/lead-dialog";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { formatPrice } from "@/lib/data";
@@ -61,7 +63,10 @@ export function ProductBuyBox({ deal }: { deal: Deal }) {
 
   return (
     <div>
-      <h1 className="text-2xl leading-snug font-extrabold text-foreground sm:text-3xl">{deal.name} | Refurbished</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="text-2xl leading-snug font-extrabold text-foreground sm:text-3xl">{deal.name} | Refurbished</h1>
+        <FavoriteButton productId={deal.id} className="shrink-0" />
+      </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
         <span className="flex items-center gap-1 font-semibold">
           <Star className="size-4 fill-amber-400 text-amber-400" /> {deal.rating.toFixed(1)}
@@ -108,6 +113,8 @@ export function ProductBuyBox({ deal }: { deal: Deal }) {
           )}
         </div>
       )}
+
+      <AddToCart deal={deal} options={Object.fromEntries(groups.map((g, i) => [g.name, g.values[picks[i] ?? 0]]))} />
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <LeadDialog product={product} className="h-12 rounded-xl bg-navy text-base hover:bg-navy-deep" />

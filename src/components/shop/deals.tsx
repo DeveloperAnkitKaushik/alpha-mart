@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { BadgeCheck, ChevronLeft, ChevronRight, Flame, RotateCcw, ShieldCheck, Star, Truck, Users, Wallet } from "lucide-react";
 import { ShopImage } from "@/components/shop/shop-image";
+import { FavoriteButton } from "@/components/store/favorite-button";
+import { StockBadge } from "@/components/store/stock-badge";
 import { LeadDialog } from "@/components/site/lead-dialog";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { Reveal } from "@/components/site/reveal";
@@ -30,11 +32,14 @@ export function DealCard({ deal }: { deal: Deal }) {
   const product = dealToProduct(deal, type);
   return (
     <article className="group flex shrink-0 basis-[82%] snap-start flex-col rounded-2xl border border-border bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:basis-[calc((100%-1rem)/2)] lg:basis-[calc((100%-2rem)/3)] 2xl:basis-[calc((100%-3rem)/4)]">
-      <Link href={`/product/${deal.id}`} className="relative block">
-        <ShopImage src={deal.images[0]} className="aspect-[4/3] rounded-xl" />
-        <span className="absolute top-2 left-2 rounded-md bg-navy px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">{deal.tag}</span>
-        <span className="absolute top-2 right-2 rounded-md bg-ember px-2 py-0.5 text-[10px] font-bold text-white">{discountPct(deal)}% OFF</span>
-      </Link>
+      <div className="relative">
+        <Link href={`/product/${deal.id}`} className="block">
+          <ShopImage src={deal.images[0]} className="aspect-[4/3] rounded-xl" />
+          <span className="absolute top-2 left-2 rounded-md bg-navy px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">{deal.tag}</span>
+          <span className="absolute top-2 right-2 rounded-md bg-ember px-2 py-0.5 text-[10px] font-bold text-white">{discountPct(deal)}% OFF</span>
+        </Link>
+        <FavoriteButton productId={deal.id} className="absolute right-2 bottom-2" />
+      </div>
       <h3 className="mt-3 line-clamp-2 min-h-10 text-sm leading-snug font-bold text-foreground">
         <Link href={`/product/${deal.id}`} className="hover:text-navy">{deal.name}</Link>
       </h3>
@@ -60,6 +65,7 @@ export function DealCard({ deal }: { deal: Deal }) {
         <span className="text-emerald-700">✓ Free 6 Month Wty</span>
         <span className="text-rose-600">Ships Within 1–3 Days</span>
       </p>
+      <StockBadge productId={deal.id} />
       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
         <LeadDialog product={product} className="h-10 rounded-lg bg-navy text-sm hover:bg-navy-deep" />
         <WhatsAppButton product={product} compact className="h-10 w-10 rounded-lg px-0" />
