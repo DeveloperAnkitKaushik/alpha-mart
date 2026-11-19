@@ -16,7 +16,7 @@ export default function RefundsPage() {
       </ul>
       <h2>Replacement within 15 days</h2>
       <p>
-        If the device you receive is faulty, not as described or damaged in transit, tell us within <strong>15 days of delivery</strong>. We will arrange a pickup and send you a replacement. If we cannot replace it, we will refund you.
+        If the device you receive is faulty, not as described or damaged in transit, tell us within <strong>15 days of delivery</strong>. We will arrange a pickup and send you a replacement.
       </p>
       <h2>Warranty</h2>
       <p>
@@ -27,12 +27,7 @@ export default function RefundsPage() {
         <li>Refunds go to the <strong>original payment method</strong> (the UPI account, card or bank account used on PhonePe).</li>
         <li>The refund is processed within <strong>5 to 7 business days</strong> after we approve the return.</li>
         <li>A return is approved after we receive the device and confirm its condition.</li>
-        <li>We do not issue refunds in cash or to a different account.</li>
       </ul>
-      <h2>Failed payments</h2>
-      <p>
-        If money was debited but the order was not confirmed, the amount is returned to your account by PhonePe and your bank, normally within a few business days. Contact us if it has not arrived.
-      </p>
       <h2>Contact</h2>
       <p>
         {BUSINESS.legalName}, {BUSINESS.address}. Email {BUSINESS.email}, phone {BUSINESS.phone}.

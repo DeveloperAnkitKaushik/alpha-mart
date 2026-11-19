@@ -92,7 +92,8 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-            <ul className="mt-6 flex flex-wrap gap-x-4 text-sm text-navy-deep/80 md:justify-end">
+            <p className="mt-6 text-xs font-bold tracking-widest text-navy-deep/80 uppercase">Policies</p>
+            <ul className="mt-1 flex flex-wrap gap-x-4 text-sm text-navy-deep/80 md:justify-end">
               {POLICIES.map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className="inline-block py-3 underline-offset-4 hover:text-navy-deep hover:underline">

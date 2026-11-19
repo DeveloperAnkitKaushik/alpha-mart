@@ -14,13 +14,12 @@ export default function ShippingPage() {
       <h2>Dispatch and delivery time</h2>
       <ul>
         <li>Orders are shipped within <strong>1 to 3 business days</strong> of payment being confirmed.</li>
-        <li>Business days are Monday to Saturday, excluding public holidays.</li>
-        <li>Once the order ships, we share the courier name and tracking details on your order page and by phone or email.</li>
+        <li>We share tracking details once your order ships.</li>
         <li>Transit time after dispatch depends on your pincode and the courier, and is usually a few days.</li>
       </ul>
       <h2>Packaging and inspection</h2>
       <p>
-        Each device is tested, cleaned and packed in protective packaging before dispatch. Please check the box for visible damage when it arrives. If it looks damaged, take photos and contact us within 48 hours of delivery.
+        Each device is tested, cleaned and packed in protective packaging before dispatch. Please check the box for visible damage when it arrives. If it looks damaged, take photos and contact us within 15 days of delivery and we will arrange a replacement.
       </p>
       <h2>Delivery address</h2>
       <p>
