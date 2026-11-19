@@ -1,6 +1,9 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useShallow } from "zustand/react/shallow";
+import { useStoreEnabled } from "@/components/store/store-flag";
+import { couponExists } from "@/lib/store/admin-actions";
 import { SALE_LAYOUTS, type Sale } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 import { editDraft, useDraft } from "./draft-store";
@@ -22,7 +25,18 @@ const update = (patch: Partial<Sale>) => editDraft((d) => ({ ...d, sale: { ...d.
 // en-CA formats as YYYY-MM-DD in the admin's own timezone.
 const today = () => new Date().toLocaleDateString("en-CA");
 
+function MissingCouponWarning({ code }: { code: string }) {
+  const { data: exists } = useQuery({ queryKey: ["coupon-exists", code], queryFn: () => couponExists(code), retry: false });
+  if (exists !== false) return null;
+  return (
+    <p role="alert" className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+      No active coupon named {code}. Customers will be told it&apos;s invalid at checkout. Create it under Coupons.
+    </p>
+  );
+}
+
 export function SaleEditor() {
+  const store = useStoreEnabled();
   const sale = useDraft((s) => s.draft?.sale);
   const onSale = useDraft(useShallow((s) => ({ on: s.draft?.products.filter((p) => p.onSale).length ?? 0, total: s.draft?.products.length ?? 0 })));
   if (!sale) return null;
@@ -79,6 +93,7 @@ export function SaleEditor() {
             </span>
           </Label>
         </div>
+        {store && sale.enabled && sale.code && <MissingCouponWarning code={sale.code} />}
         {pastEnd && <p role="alert" className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">This date has passed, so the sale won&apos;t show. Pick a later date or clear it.</p>}
         <p className="rounded-xl bg-cream px-3 py-2 text-sm text-navy">
           <strong>{onSale.on}</strong> of {onSale.total} products are marked <em>On sale</em>. Change this in the Products tab.

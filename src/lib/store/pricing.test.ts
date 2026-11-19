@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONTENT, findType, offeredOptions, type SiteContent } from "@/lib/site-content";
 import { checkStock, couponDiscount, priceLines } from "@/lib/store/pricing";
-import type { CartLine, Coupon } from "@/lib/store/schemas";
+import { couponSchema, type CartLine, type Coupon } from "@/lib/store/schemas";
 
 const product = DEFAULT_CONTENT.products.find(
   (p) => offeredOptions(findType(DEFAULT_CONTENT.types, p), p).filter((g) => g.values.length > 1).length >= 2,
@@ -91,5 +91,12 @@ describe("checkStock", () => {
     const lines = [baseLine, { ...baseLine, options: topPicks }];
     expect(checkStock(lines, { [product.id]: 1 }, { [product.id]: "Dell" })).toBe("Only 1 left of Dell");
     expect(checkStock(lines, { [product.id]: 2 }, { [product.id]: "Dell" })).toBeNull();
+  });
+});
+
+describe("couponSchema", () => {
+  it("rejects an expiry that is not a real calendar date", () => {
+    const parse = (expiresAt: string) => couponSchema.safeParse({ ...coupon, expiresAt }).success;
+    expect([parse("2026-12-31"), parse("2026-02-30"), parse("12/31/2026")]).toEqual([true, false, false]);
   });
 });

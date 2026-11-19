@@ -2,13 +2,17 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { LayoutGrid, LineChart, RotateCw, ServerCrash } from "lucide-react";
+import { Boxes, LayoutGrid, LineChart, PackageCheck, RotateCw, ServerCrash, TicketPercent } from "lucide-react";
 import { Tabs } from "@base-ui/react/tabs";
 import { TabBar } from "./tab-bar";
 import { ItemsView } from "./items/items-view";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
 import { DashboardSkeleton } from "./dashboard-skeleton";
+import { useStoreEnabled } from "@/components/store/store-flag";
+import { CouponsTab } from "./store/coupons-tab";
+import { OrdersTab } from "./store/orders-tab";
+import { StockTab } from "./store/stock-tab";
 import { useAuth } from "@/lib/auth-store";
 import { updateItem, type InboxItem, type Status } from "@/lib/dashboard-api";
 import { downloadCsv, filterItems, type InboxFilter } from "@/lib/inbox";
@@ -25,18 +29,31 @@ const TOP_TABS = [
   { value: "dashboard", label: "Dashboard", icon: LineChart },
   { value: "items", label: "Items", icon: LayoutGrid },
 ];
+const STORE_TABS = [
+  { value: "orders", label: "Orders", icon: PackageCheck },
+  { value: "stock", label: "Stock", icon: Boxes },
+  { value: "coupons", label: "Coupons", icon: TicketPercent },
+];
 
 // Dashboard = enquiry numbers and inbox; Items = everything shown on the storefront.
 export function StaffView() {
+  const store = useStoreEnabled();
   return (
     <Tabs.Root defaultValue="dashboard">
-      <TabBar label="Admin sections" tabs={TOP_TABS} />
+      <TabBar label="Admin sections" tabs={store ? [...TOP_TABS, ...STORE_TABS] : TOP_TABS} />
       <Tabs.Panel value="dashboard" className="mt-6 outline-none">
         <Inbox />
       </Tabs.Panel>
       <Tabs.Panel value="items" className="mt-6 outline-none">
         <ItemsView />
       </Tabs.Panel>
+      {store && (
+        <>
+          <Tabs.Panel value="orders" className="mt-6 outline-none"><OrdersTab /></Tabs.Panel>
+          <Tabs.Panel value="stock" className="mt-6 outline-none"><StockTab /></Tabs.Panel>
+          <Tabs.Panel value="coupons" className="mt-6 outline-none"><CouponsTab /></Tabs.Panel>
+        </>
+      )}
     </Tabs.Root>
   );
 }

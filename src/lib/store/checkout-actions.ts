@@ -4,10 +4,12 @@ import { z } from "zod";
 import { loadCatalog } from "@/lib/server/catalog";
 import { serverEnv } from "@/lib/server/env";
 import { adminDb, AuthError, requireUser } from "@/lib/server/firebase-admin";
-import { customerUsedCoupon, quoteCoupon, reconcileOrder, reserveOrder, settleOrder, sweepExpired, type OrderDoc } from "@/lib/server/orders";
+import { customerUsedCoupon, quoteCoupon, reconcileOrder, reserveOrder, settleOrder, sweepExpired, toOrderView, type OrderDoc, type OrderView } from "@/lib/server/orders";
 import { createPayment } from "@/lib/server/phonepe";
 import { priceLines, type PricedLine } from "@/lib/store/pricing";
 import { addressSchema, cartLineSchema, couponCodeSchema, type CartLine } from "@/lib/store/schemas";
+
+export type { OrderView };
 
 type Failure = { ok: false; error: string };
 
@@ -90,13 +92,6 @@ export async function createOrder(
   }
 }
 
-export type OrderView = Omit<OrderDoc, "uid" | "reservedUntil" | "createdAt" | "updatedAt"> & {
-  id: string;
-  reservedUntil: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export async function getMyOrder(
   idToken: string,
   orderId: string,
@@ -115,16 +110,7 @@ export async function getMyOrder(
       snap = await ref.get();
       ({ uid: owner, ...order } = snap.data() as OrderDoc);
     }
-    return {
-      ok: true,
-      order: {
-        ...order,
-        id: orderId,
-        reservedUntil: order.reservedUntil.toDate().toISOString(),
-        createdAt: order.createdAt.toDate().toISOString(),
-        updatedAt: order.updatedAt.toDate().toISOString(),
-      },
-    };
+    return { ok: true, order: toOrderView(orderId, order) };
   } catch (e) {
     if (e instanceof AuthError) return { ok: false, error: "auth" };
     throw e;

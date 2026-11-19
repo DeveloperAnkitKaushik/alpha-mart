@@ -22,6 +22,23 @@ export type OrderDoc = {
   trackingNote: string;
 };
 
+export type OrderView = Omit<OrderDoc, "uid" | "reservedUntil" | "createdAt" | "updatedAt"> & {
+  id: string;
+  reservedUntil: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function toOrderView(id: string, order: Omit<OrderDoc, "uid">): OrderView {
+  return {
+    ...order,
+    id,
+    reservedUntil: order.reservedUntil.toDate().toISOString(),
+    createdAt: order.createdAt.toDate().toISOString(),
+    updatedAt: order.updatedAt.toDate().toISOString(),
+  };
+}
+
 type Failure = { ok: false; error: string };
 
 export class OrderNotFoundError extends Error {}

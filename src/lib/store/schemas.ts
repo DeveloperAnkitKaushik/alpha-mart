@@ -18,12 +18,17 @@ export const addressSchema = z.object({
 
 export const couponCodeSchema = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,20}$/);
 
+const isCalendarDate = (s: string) => {
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);
+};
+
 export const couponSchema = z.object({
   type: z.enum(["flat", "percent"]),
   value: z.number().int().positive(),
   maxDiscount: z.number().int().positive().nullable(),
   minOrder: z.number().int().min(0),
-  expiresAt: z.string(), // YYYY-MM-DD, valid through the end of that day in IST
+  expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isCalendarDate), // valid through the end of that day in IST
   active: z.boolean(),
   maxUses: z.number().int().positive().nullable(),
   oncePerCustomer: z.boolean(),
