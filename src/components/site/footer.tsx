@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { FooterQuote } from "@/components/site/footer-quote";
 import { Reveal } from "@/components/site/reveal";
+import { BUSINESS } from "@/lib/business";
 
 const LINKS = [
   { label: "Laptops", href: "/collections/laptops" },
@@ -11,9 +12,16 @@ const LINKS = [
   { label: "Contact", href: "/requirement" },
 ];
 
+const POLICIES = [
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
+  { label: "Refunds", href: "/refunds" },
+  { label: "Shipping", href: "/shipping" },
+];
+
 const CONTACT = [
   { icon: MessageCircle, label: "Chat on WhatsApp", href: "https://wa.me/?text=Hi%20Alpha%20Mart" },
-  { icon: Mail, label: "Email us", href: "mailto:hello@alphamart.example" },
+  { icon: Mail, label: "Email us", href: `mailto:${BUSINESS.email}` },
   { icon: Phone, label: "Request a callback", href: "/requirement" },
 ];
 
@@ -47,15 +55,18 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-            <a href="mailto:hello@alphamart.example" className="mt-7 block text-lg font-medium underline-offset-4 hover:underline">
-              hello@alphamart.example
+            <a href={`mailto:${BUSINESS.email}`} className="mt-7 block text-lg font-medium underline-offset-4 hover:underline">
+              {BUSINESS.email}
             </a>
+            <p className="mt-1 text-sm text-navy-deep/80">{BUSINESS.phone}</p>
             <p className="mt-3 flex items-start gap-2 text-sm leading-relaxed text-navy-deep/80">
               <MapPin className="mt-0.5 size-4 shrink-0" />
               <span>
-                Delhi, India
+                {BUSINESS.legalName}
                 <br />
-                Certified refurbished laptops and PCs
+                {BUSINESS.address}
+                <br />
+                GSTIN: {BUSINESS.gstin}
               </span>
             </p>
           </div>
@@ -77,6 +88,15 @@ export function Footer() {
                   <Link href={l.href} className="group relative inline-block text-xl font-medium transition-transform duration-300 hover:translate-x-1 md:text-2xl md:hover:-translate-x-1">
                     {l.label}
                     <span className="absolute inset-x-0 -bottom-0.5 h-px origin-left scale-x-0 bg-navy-deep transition-transform duration-300 group-hover:scale-x-100" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <ul className="mt-6 flex flex-wrap gap-x-4 gap-y-1 text-sm text-navy-deep/80 md:justify-end">
+              {POLICIES.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className="underline-offset-4 hover:text-navy-deep hover:underline">
+                    {l.label}
                   </Link>
                 </li>
               ))}
