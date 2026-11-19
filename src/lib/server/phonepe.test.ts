@@ -72,6 +72,19 @@ describe("phonepe client", () => {
     expect(await getPaymentState("o1")).toEqual({ state: "COMPLETED", transactionId: "t2" });
   });
 
+  it("reports an order PhonePe has no record of as not found", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url: string) =>
+        url.includes("oauth/token")
+          ? tokenRes()
+          : json({ success: false, code: "INVALID_MERCHANT_ORDER_ID", message: "No entry found for given merchant order id" }, 400),
+      ),
+    );
+    const { getPaymentState, PaymentNotFoundError } = await load();
+    await expect(getPaymentState("o1")).rejects.toBeInstanceOf(PaymentNotFoundError);
+  });
+
   it("throws on non-2xx from create", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(json({}, 400)));
     const { createPayment } = await load();

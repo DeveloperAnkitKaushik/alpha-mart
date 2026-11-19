@@ -42,13 +42,20 @@ async function accessToken(): Promise<string> {
   return t.access_token;
 }
 
+export class PaymentNotFoundError extends Error {}
+
+// The docs show this code ("No entry found for given merchant order id") but not its HTTP status.
+const notFoundSchema = z.object({ code: z.literal("INVALID_MERCHANT_ORDER_ID") });
+
 async function pg(path: string, init: RequestInit = {}): Promise<unknown> {
   const res = await fetch(`${BASE[phonepeEnv().PHONEPE_ENV].pg}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", Authorization: `O-Bearer ${await accessToken()}` },
   });
+  const body: unknown = await res.json().catch(() => null);
+  if (res.status === 404 || notFoundSchema.safeParse(body).success) throw new PaymentNotFoundError(path);
   if (!res.ok) throw new Error(`PhonePe request failed: ${res.status}`);
-  return res.json();
+  return body;
 }
 
 export async function createPayment(p: {

@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { z } from "zod";
 import { adminDb } from "@/lib/server/firebase-admin";
-import { getPaymentState } from "@/lib/server/phonepe";
+import { getPaymentState, PaymentNotFoundError } from "@/lib/server/phonepe";
 import { paymentEffect, type OrderStatus, type PgState } from "@/lib/store/order-state";
 import { checkStock, couponDiscount, type PricedLine } from "@/lib/store/pricing";
 import { couponSchema, type Address, type CartLine, type Coupon } from "@/lib/store/schemas";
@@ -24,10 +24,13 @@ export type OrderDoc = {
 
 type Failure = { ok: false; error: string };
 
+export class OrderNotFoundError extends Error {}
+
 const HOLD_MS = 20 * 60 * 1000;
 // Orders that keep a coupon use: pending ones hold it, fulfilled ones spent it.
 const HOLDS_COUPON: OrderStatus[] = ["pending_payment", "paid", "packed", "shipped", "delivered"];
-const RECONCILABLE: OrderStatus[] = ["pending_payment", "expired", "failed"];
+// Expired stays here because a late payment can still complete it.
+const RECONCILABLE: OrderStatus[] = ["pending_payment", "expired"];
 const stockDoc = z.object({ available: z.number().int() });
 
 const orderRef = (id: string) => adminDb().doc(`orders/${id}`);
@@ -133,7 +136,7 @@ export async function settleOrder(
 ): Promise<OrderStatus> {
   return adminDb().runTransaction(async (tx) => {
     const snap = await tx.get(orderRef(orderId));
-    if (!snap.exists) throw new Error(`Order ${orderId} not found`);
+    if (!snap.exists) throw new OrderNotFoundError(orderId);
     const order = snap.data() as OrderDoc;
     const paidLate = (order.status === "expired" || order.status === "failed") && pg.state === "COMPLETED";
     const stockAvailable = paidLate && checkStock(order.items, await readStock(tx, order.items), {}) === null;
@@ -152,10 +155,19 @@ export async function settleOrder(
 
 export async function reconcileOrder(orderId: string): Promise<OrderStatus> {
   const snap = await orderRef(orderId).get();
-  if (!snap.exists) throw new Error(`Order ${orderId} not found`);
-  const { status } = snap.data() as OrderDoc;
-  if (!RECONCILABLE.includes(status)) return status;
-  return settleOrder(orderId, await getPaymentState(orderId));
+  if (!snap.exists) throw new OrderNotFoundError(orderId);
+  const order = snap.data() as OrderDoc;
+  if (!RECONCILABLE.includes(order.status)) return order.status;
+  let pg: Awaited<ReturnType<typeof getPaymentState>>;
+  try {
+    pg = await getPaymentState(orderId);
+  } catch (e) {
+    if (!(e instanceof PaymentNotFoundError)) throw e;
+    // PhonePe never saw this order (we died before or during createPayment): release it once the hold lapses.
+    if (order.reservedUntil.toMillis() >= Date.now()) return order.status;
+    pg = { state: "FAILED", transactionId: null };
+  }
+  return settleOrder(orderId, pg);
 }
 
 // shortcut: unordered limit 50 with an in-code expiry filter avoids a composite index; add one if pending orders ever exceed 50.

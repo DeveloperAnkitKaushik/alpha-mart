@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { reconcileOrder } from "@/lib/server/orders";
+import { OrderNotFoundError, reconcileOrder } from "@/lib/server/orders";
 import { isValidWebhookAuth } from "@/lib/server/phonepe";
 
 const callback = z.object({ payload: z.object({ merchantOrderId: z.string().regex(/^[A-Za-z0-9]{20}$/) }) });
@@ -9,6 +9,11 @@ export async function POST(req: Request) {
   if (!isValidWebhookAuth(req.headers.get("authorization"))) return new Response(null, { status: 401 });
   const body = callback.safeParse(await req.json().catch(() => null));
   if (!body.success) return new Response(null, { status: 400 });
-  await reconcileOrder(body.data.payload.merchantOrderId);
+  try {
+    await reconcileOrder(body.data.payload.merchantOrderId);
+  } catch (e) {
+    // Unknown orders are acknowledged so PhonePe stops retrying; any other failure is a 500 and gets retried.
+    if (!(e instanceof OrderNotFoundError)) throw e;
+  }
   return new Response(null, { status: 200 });
 }
