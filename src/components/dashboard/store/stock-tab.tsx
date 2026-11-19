@@ -13,7 +13,7 @@ const Row = memo(function Row({ id, name, available }: { id: string; name: strin
   const [value, setValue] = useState(String(available));
   const client = useQueryClient();
   const save = useMutation({
-    mutationFn: async () => unwrap(await setStock(await adminToken(), id, Number(value))),
+    mutationFn: async () => unwrap(await setStock(await adminToken(), id, Number(value), available)),
     onSuccess: () => {
       toast.success("Stock saved");
       void client.invalidateQueries({ queryKey: ["stock"] });

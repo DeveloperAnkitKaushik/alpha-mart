@@ -15,6 +15,8 @@ const NOT_ADMIN: Failure = { ok: false, error: "Your session expired or this acc
 const orderIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
 const statusSchema = z.enum(ORDER_STATUSES);
 const couponInputSchema = couponSchema.omit({ uses: true });
+// Matches useStock(): a missing or malformed doc reads as 0, negatives as 0.
+const stockDocSchema = z.object({ available: z.number().int() });
 
 // Turns an AuthError into the shared failure; anything else is a real fault and rethrows.
 async function asAdmin<T>(idToken: unknown, run: () => Promise<T>): Promise<T | Failure> {
@@ -83,13 +85,21 @@ export async function setOrderStatus(idToken: string, orderId: string, to: Order
   );
 }
 
-export async function setStock(idToken: string, productId: string, available: number): Promise<Result> {
-  const input = z.object({ id: z.string().min(1).max(80), n: z.number().int().min(0).max(999) }).safeParse({ id: productId, n: available });
+// Compare-and-set: a checkout between page load and save would otherwise be overwritten and oversold.
+export async function setStock(idToken: string, productId: string, available: number, expected: number): Promise<Result> {
+  const input = z
+    .object({ id: z.string().min(1).max(80), n: z.number().int().min(0).max(999), expected: z.number().int().min(0) })
+    .safeParse({ id: productId, n: available, expected });
   if (!input.success) return { ok: false, error: "Stock must be a whole number from 0 to 999." };
-  return asAdmin(idToken, async () => {
-    await adminDb().doc(`stock/${input.data.id}`).set({ available: input.data.n, updatedAt: Timestamp.now() }, { merge: true });
-    return { ok: true };
-  });
+  return asAdmin(idToken, () =>
+    adminDb().runTransaction(async (tx): Promise<Result> => {
+      const ref = adminDb().doc(`stock/${input.data.id}`);
+      const current = Math.max(0, stockDocSchema.safeParse((await tx.get(ref)).data()).data?.available ?? 0);
+      if (current !== input.data.expected) return { ok: false, error: "Stock changed since you loaded this page. Refresh and try again." };
+      tx.set(ref, { available: input.data.n, updatedAt: Timestamp.now() }, { merge: true });
+      return { ok: true };
+    }),
+  );
 }
 
 export async function listCoupons(idToken: string): Promise<{ ok: true; coupons: (Coupon & { code: string })[] } | Failure> {
