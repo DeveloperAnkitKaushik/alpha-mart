@@ -75,11 +75,11 @@ function Summary({ order }: { order: OrderView }) {
   );
 }
 
-function Detail({ orderId }: { orderId: string }) {
+function Detail({ uid, orderId }: { uid: string; orderId: string }) {
   const [startedAt] = useState(() => Date.now());
   const [timedOut, setTimedOut] = useState(false);
   const q = useQuery({
-    queryKey: ["order", orderId],
+    queryKey: ["order", uid, orderId],
     retry: false,
     queryFn: async () => {
       const user = useAuth.getState().user;
@@ -152,5 +152,5 @@ export function OrderDetail({ orderId }: { orderId: string }) {
   const uid = useAuth((s) => s.user?.uid);
   if (!ready) return <Skeleton className="h-64" />;
   if (!uid) return <SignInView embedded />;
-  return <Detail key={uid} orderId={orderId} />;
+  return <Detail key={uid} uid={uid} orderId={orderId} />;
 }
