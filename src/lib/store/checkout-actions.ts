@@ -3,8 +3,8 @@
 import { z } from "zod";
 import { loadCatalog } from "@/lib/server/catalog";
 import { serverEnv } from "@/lib/server/env";
-import { AuthError, requireUser } from "@/lib/server/firebase-admin";
-import { customerUsedCoupon, quoteCoupon, reserveOrder, settleOrder, sweepExpired } from "@/lib/server/orders";
+import { adminDb, AuthError, requireUser } from "@/lib/server/firebase-admin";
+import { customerUsedCoupon, quoteCoupon, reconcileOrder, reserveOrder, settleOrder, sweepExpired, type OrderDoc } from "@/lib/server/orders";
 import { createPayment } from "@/lib/server/phonepe";
 import { priceLines, type PricedLine } from "@/lib/store/pricing";
 import { addressSchema, cartLineSchema, couponCodeSchema, type CartLine } from "@/lib/store/schemas";
@@ -86,6 +86,47 @@ export async function createOrder(
     }
   } catch (e) {
     if (e instanceof AuthError) return SESSION_EXPIRED;
+    throw e;
+  }
+}
+
+export type OrderView = Omit<OrderDoc, "uid" | "reservedUntil" | "createdAt" | "updatedAt"> & {
+  id: string;
+  reservedUntil: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function getMyOrder(
+  idToken: string,
+  orderId: string,
+): Promise<{ ok: true; order: OrderView } | { ok: false; error: "not_found" | "auth" }> {
+  try {
+    const uid = await requireUser(idToken);
+    if (typeof orderId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(orderId)) return { ok: false, error: "not_found" };
+    const ref = adminDb().doc(`orders/${orderId}`);
+    let snap = await ref.get();
+    if (!snap.exists) return { ok: false, error: "not_found" };
+    let { uid: owner, ...order } = snap.data() as OrderDoc;
+    if (owner !== uid && !(await adminDb().doc(`admins/${uid}`).get()).exists) return { ok: false, error: "not_found" };
+    if (order.status === "pending_payment") {
+      // PhonePe being unreachable must not hide the order; the page keeps polling.
+      await reconcileOrder(orderId).catch(() => undefined);
+      snap = await ref.get();
+      ({ uid: owner, ...order } = snap.data() as OrderDoc);
+    }
+    return {
+      ok: true,
+      order: {
+        ...order,
+        id: orderId,
+        reservedUntil: order.reservedUntil.toDate().toISOString(),
+        createdAt: order.createdAt.toDate().toISOString(),
+        updatedAt: order.updatedAt.toDate().toISOString(),
+      },
+    };
+  } catch (e) {
+    if (e instanceof AuthError) return { ok: false, error: "auth" };
     throw e;
   }
 }

@@ -3,6 +3,7 @@ import { MessageCircle, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUSES, type Kind, type Status } from "@/lib/dashboard-api";
 import { KIND_LABEL, STATUS_LABEL } from "@/lib/inbox";
+import type { OrderStatus } from "@/lib/store/order-state";
 
 const STATUS_STYLE: Record<Status, string> = {
   new: "bg-ember/15 text-ember ring-ember/30",
@@ -19,6 +20,28 @@ const KIND_STYLE: Record<Kind, string> = {
 };
 
 const pill = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap";
+
+const GOOD = "bg-emerald-50 text-emerald-700 ring-emerald-600/20";
+const BAD = "bg-rose-50 text-rose-600 ring-rose-200";
+const WAIT = "bg-ember/15 text-ember ring-ember/30";
+const NEUTRAL = "bg-muted text-muted-foreground ring-border";
+
+const ORDER_STYLE: Record<OrderStatus, [label: string, style: string]> = {
+  pending_payment: ["Awaiting payment", WAIT],
+  paid: ["Paid", GOOD],
+  packed: ["Packed", "bg-skyblue/10 text-skyblue ring-skyblue/25"],
+  shipped: ["Shipped", "bg-skyblue/10 text-skyblue ring-skyblue/25"],
+  delivered: ["Delivered", GOOD],
+  failed: ["Failed", BAD],
+  expired: ["Expired", NEUTRAL],
+  cancelled: ["Cancelled", NEUTRAL],
+  refunded: ["Refunded", NEUTRAL],
+  needs_attention: ["Needs attention", WAIT],
+};
+
+export const OrderStatusBadge = ({ status }: { status: OrderStatus }) => (
+  <span className={cn(pill, "ring-1", ORDER_STYLE[status][1])}>{ORDER_STYLE[status][0]}</span>
+);
 
 export const StatusBadge = ({ status }: { status: Status }) => (
   <span className={cn(pill, "ring-1", STATUS_STYLE[status])}>{STATUS_LABEL[status]}</span>
