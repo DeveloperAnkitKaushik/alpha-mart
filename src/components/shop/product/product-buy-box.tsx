@@ -6,6 +6,7 @@ import { Copy, Sparkles, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { AddToCart } from "@/components/store/add-to-cart";
 import { FavoriteButton } from "@/components/store/favorite-button";
+import { useStoreEnabled } from "@/components/store/store-flag";
 import { LeadDialog } from "@/components/site/lead-dialog";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { formatPrice } from "@/lib/data";
@@ -39,6 +40,7 @@ function Options({ label, values, value, onChange }: { label: string; values: st
 
 export function ProductBuyBox({ deal }: { deal: Deal }) {
   const { types, sale } = useSiteContent();
+  const store = useStoreEnabled();
   const type = findType(types, deal);
   const groups = offeredOptions(type, deal);
   // One picked index per option group; the cheapest value is the default.
@@ -72,7 +74,7 @@ export function ProductBuyBox({ deal }: { deal: Deal }) {
           <Star className="size-4 fill-amber-400 text-amber-400" /> {deal.rating.toFixed(1)}
           <span className="font-normal text-muted-foreground">({deal.reviews} ratings)</span>
         </span>
-        <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">In stock</span>
+        {!store && <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">In stock</span>}
       </div>
 
       <motion.p key={price} initial={{ opacity: 0.4, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-5 flex flex-wrap items-baseline gap-3">
