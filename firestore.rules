@@ -75,5 +75,40 @@ service cloud.firestore {
       allow update: if validStaffUpdate();
       allow delete: if false;
     }
+
+    match /stock/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /coupons/{id} {
+      allow read, write: if false;
+    }
+
+    match /orders/{id} {
+      allow read: if isAdmin() || isOwner();
+      allow write: if false;
+    }
+
+    match /carts/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['items'])
+        && request.resource.data.items is list && request.resource.data.items.size() <= 30;
+    }
+
+    match /favorites/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['productIds'])
+        && request.resource.data.productIds is list && request.resource.data.productIds.size() <= 200;
+    }
+
+    match /profiles/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['address'])
+        && request.resource.data.address is map;
+    }
   }
 }

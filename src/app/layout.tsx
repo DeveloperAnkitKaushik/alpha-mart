@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site/site-header";
 import { Footer } from "@/components/site/footer";
 import { Toaster } from "@/components/ui/sonner";
 import { SiteContentProvider } from "@/components/site/site-content";
+import { StoreFlagProvider } from "@/components/store/store-flag";
 import { getSiteContent } from "@/lib/site-content-server";
 
 const urbanist = Urbanist({
@@ -35,6 +36,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${urbanist.variable} ${bricolage.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        <StoreFlagProvider enabled={process.env.STORE_ENABLED === "true"}>
         <Providers>
           <SiteContentProvider content={await getSiteContent()}>
             <SiteHeader />
@@ -43,6 +45,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <Toaster theme="light" />
           </SiteContentProvider>
         </Providers>
+        </StoreFlagProvider>
       </body>
     </html>
   );
