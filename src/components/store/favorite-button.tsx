@@ -7,11 +7,9 @@ import { useStoreEnabled } from "@/components/store/store-flag";
 import { useAuth } from "@/lib/auth-store";
 import { toggleFavorite, useIsFavorite } from "@/lib/store/client-data";
 
-export function FavoriteButton({ productId, className = "" }: { productId: string; className?: string }) {
-  const enabled = useStoreEnabled();
+function HeartToggle({ productId, className }: { productId: string; className: string }) {
   const saved = useIsFavorite(productId);
   const router = useRouter();
-  if (!enabled) return null;
 
   const onClick = () => {
     const user = useAuth.getState().user;
@@ -30,4 +28,8 @@ export function FavoriteButton({ productId, className = "" }: { productId: strin
       <Heart className={`size-5 ${saved ? "fill-ember text-ember" : ""}`} />
     </button>
   );
+}
+
+export function FavoriteButton({ productId, className = "" }: { productId: string; className?: string }) {
+  return useStoreEnabled() ? <HeartToggle productId={productId} className={className} /> : null;
 }

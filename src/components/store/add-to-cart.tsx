@@ -12,13 +12,10 @@ import type { Deal } from "@/lib/shop-data";
 const MAX_QTY = 10;
 const stepBtn = "grid size-11 place-items-center transition hover:bg-cream disabled:opacity-40";
 
-export function AddToCart({ deal, options }: { deal: Deal; options: Record<string, string> }) {
-  const enabled = useStoreEnabled();
+function Controls({ deal, options }: { deal: Deal; options: Record<string, string> }) {
   const stock = useStock();
   const router = useRouter();
   const [wanted, setWanted] = useState(1);
-  if (!enabled) return null;
-
   const cap = stock === undefined ? MAX_QTY : Math.min(stock[deal.id] ?? 0, MAX_QTY);
   const soldOut = cap === 0;
   const qty = Math.min(wanted, Math.max(cap, 1));
@@ -49,4 +46,8 @@ export function AddToCart({ deal, options }: { deal: Deal; options: Record<strin
       </button>
     </div>
   );
+}
+
+export function AddToCart({ deal, options }: { deal: Deal; options: Record<string, string> }) {
+  return useStoreEnabled() ? <Controls deal={deal} options={options} /> : null;
 }

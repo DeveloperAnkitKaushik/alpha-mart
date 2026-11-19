@@ -3,10 +3,9 @@
 import { useStoreEnabled } from "@/components/store/store-flag";
 import { useStock } from "@/lib/store/client-data";
 
-export function StockBadge({ productId }: { productId: string }) {
-  const enabled = useStoreEnabled();
+function Badge({ productId }: { productId: string }) {
   const stock = useStock();
-  if (!enabled || stock === undefined) return null;
+  if (stock === undefined) return null;
   const left = stock[productId] ?? 0;
   if (left > 3) return null;
   return (
@@ -14,4 +13,8 @@ export function StockBadge({ productId }: { productId: string }) {
       {left === 0 ? "Sold out" : `Only ${left} left`}
     </span>
   );
+}
+
+export function StockBadge({ productId }: { productId: string }) {
+  return useStoreEnabled() ? <Badge productId={productId} /> : null;
 }
