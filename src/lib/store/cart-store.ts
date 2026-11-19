@@ -5,13 +5,11 @@ import { z } from "zod";
 import { useAuth } from "@/lib/auth-store";
 import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import { watchFavorites } from "./client-data";
+import { addLines, mergeCarts } from "./cart-merge";
 import { cartLineSchema, type CartLine } from "./schemas";
 
 const MAX_QTY = 10;
 const MAX_LINES = 30;
-
-const lineKey = (l: CartLine) =>
-  JSON.stringify([l.productId, Object.entries(l.options).sort(([a], [b]) => a.localeCompare(b))]);
 
 function parseLines(raw: unknown): CartLine[] {
   if (!Array.isArray(raw)) return [];
@@ -19,16 +17,6 @@ function parseLines(raw: unknown): CartLine[] {
     const r = cartLineSchema.safeParse(l);
     return r.success ? [r.data] : [];
   });
-}
-
-function mergeLines(...lists: CartLine[][]): CartLine[] {
-  const byKey = new Map<string, CartLine>();
-  for (const l of lists.flat()) {
-    const k = lineKey(l);
-    const prev = byKey.get(k);
-    byKey.set(k, prev ? { ...prev, qty: Math.min(MAX_QTY, prev.qty + l.qty) } : l);
-  }
-  return [...byKey.values()];
 }
 
 interface CartState {
@@ -43,7 +31,7 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       lines: [],
-      add: (line) => set((s) => ({ lines: mergeLines(s.lines, [line]) })),
+      add: (line) => set((s) => ({ lines: addLines(s.lines, [line]) })),
       setQty: (i, qty) =>
         set((s) => ({
           lines: s.lines.map((l, j) => (j === i ? { ...l, qty: Math.max(1, Math.min(MAX_QTY, qty)) } : l)),
@@ -101,10 +89,9 @@ export function startCartSync() {
       const snap = await getDoc(cartDoc(uid));
       if (lastUid !== uid) return;
       const remote = remoteCart.safeParse(snap.data());
-      const merged = mergeLines(remote.success ? parseLines(remote.data.items) : [], useCart.getState().lines);
+      const merged = mergeCarts(remote.success ? parseLines(remote.data.items) : [], useCart.getState().lines);
+      syncUid = uid;
       useCart.setState({ lines: merged });
-      await pushCart(uid, merged);
-      if (lastUid === uid) syncUid = uid;
     } catch {
       // Cart stays local; the next sign-in retries the merge.
     }
