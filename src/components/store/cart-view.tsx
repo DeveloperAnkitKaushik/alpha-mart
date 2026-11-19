@@ -70,10 +70,10 @@ function Coupon({ applied, error, onApply }: { applied: string | null; error?: s
         <button type="submit" className="h-11 rounded-xl px-4 text-sm font-bold ring-1 ring-border hover:bg-cream">Apply</button>
       </div>
       {shown && <p role="alert" className="mt-1.5 text-xs text-destructive">{shown}</p>}
-      {applied && !shown && (
+      {applied && (
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {applied} applied.{" "}
-          <button type="button" onClick={() => { setDraft(""); onApply(null); }} className="font-semibold underline">Remove</button>
+          {shown ? `${applied} can't be used.` : `${applied} applied.`}{" "}
+          <button type="button" onClick={() => { setDraft(""); setLocal(undefined); onApply(null); }} className="font-semibold underline">Remove</button>
         </p>
       )}
     </form>
