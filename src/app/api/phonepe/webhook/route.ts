@@ -8,7 +8,8 @@ const callback = z.object({ payload: z.object({ merchantOrderId: z.string().rege
 export async function POST(req: Request) {
   if (!isValidWebhookAuth(req.headers.get("authorization"))) return new Response(null, { status: 401 });
   const body = callback.safeParse(await req.json().catch(() => null));
-  if (!body.success) return new Response(null, { status: 400 });
+  // Authenticated but not an order event (e.g. PhonePe's validation ping when the webhook is created): acknowledge, do nothing.
+  if (!body.success) return new Response(null, { status: 200 });
   try {
     await reconcileOrder(body.data.payload.merchantOrderId);
   } catch (e) {

@@ -38,7 +38,8 @@ export const STAFF_NEXT: Record<OrderStatus, OrderStatus[]> = {
   expired: [],
   cancelled: [],
   refunded: [],
-  needs_attention: ["packed", "refunded"],
+  // Straight to shipped: its units were never reserved, so it must never reach packed → cancelled, which restocks.
+  needs_attention: ["shipped", "refunded"],
 };
 
 export function staffEffect(from: OrderStatus, to: OrderStatus): { ok: true; restock: boolean } | { ok: false } {

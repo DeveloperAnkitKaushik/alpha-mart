@@ -41,10 +41,15 @@ describe("paymentEffect", () => {
 });
 
 describe("staffEffect", () => {
-  it("allows paid to packed to shipped to delivered, and a late-paid needs_attention order to be packed", () => {
-    for (const [a, b] of [["paid", "packed"], ["packed", "shipped"], ["shipped", "delivered"], ["needs_attention", "packed"]] as const) {
+  it("allows paid to packed to shipped to delivered, and a late-paid needs_attention order to be shipped", () => {
+    for (const [a, b] of [["paid", "packed"], ["packed", "shipped"], ["shipped", "delivered"], ["needs_attention", "shipped"]] as const) {
       expect(staffEffect(a, b)).toEqual({ ok: true, restock: false });
     }
+  });
+
+  it("never lets a needs_attention order reach a restocking cancel", () => {
+    expect(staffEffect("needs_attention", "packed")).toEqual({ ok: false });
+    expect(staffEffect("needs_attention", "cancelled")).toEqual({ ok: false });
   });
 
   it("restocks only when cancelling a paid or packed order", () => {
