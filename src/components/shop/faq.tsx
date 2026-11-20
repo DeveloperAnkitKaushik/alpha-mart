@@ -3,15 +3,20 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { MessageCircle, Plus } from "lucide-react";
+import { useStoreEnabled } from "@/components/store/store-flag";
 
 const FAQS = [
   { q: "Why choose a refurbished laptop?", a: "You get business-grade hardware at a fraction of the new price, and every purchase keeps a working device out of landfill." },
   { q: "What warranty and support do I get?", a: "Every device carries a 6 month warranty. Reach us on WhatsApp or the enquiry form and we respond the same day." },
-  { q: "How do I buy, if there is no cart?", a: "Tap Get best price or WhatsApp on any device. We confirm availability, share a final quote and arrange payment and delivery with you directly." },
   { q: "Can I return or replace a device?", a: "Yes. Within 15 days, tell us what is wrong and we will arrange a replacement." },
 ];
 
+const BUY_OFFLINE = { q: "How do I buy, if there is no cart?", a: "Tap Get best price or WhatsApp on any device. We confirm availability, share a final quote and arrange payment and delivery with you directly." };
+const BUY_ONLINE = { q: "How do I buy?", a: "Add a device to your cart, check out and pay with PhonePe (UPI, cards or netbanking). For a custom quote, enquire on WhatsApp." };
+
 export function Faq() {
+  const store = useStoreEnabled();
+  const faqs = [FAQS[0], FAQS[1], store ? BUY_ONLINE : BUY_OFFLINE, FAQS[2]];
   const [open, setOpen] = useState<number | null>(0);
 
   return (
@@ -31,7 +36,7 @@ export function Faq() {
       </div>
 
       <ul className="divide-y divide-border border-y border-border">
-        {FAQS.map((f, i) => {
+        {faqs.map((f, i) => {
           const isOpen = open === i;
           return (
             <li key={f.q}>

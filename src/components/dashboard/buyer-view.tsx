@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Inbox, RotateCw, WifiOff } from "lucide-react";
+import { useStoreEnabled } from "@/components/store/store-flag";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
 import { BuyerSkeleton } from "./dashboard-skeleton";
@@ -13,24 +14,42 @@ import { useInbox, useNow } from "./use-inbox";
 export function BuyerView({ uid }: { uid: string }) {
   const { items, error, retry } = useInbox({ uid });
   const now = useNow();
+  const storeEnabled = useStoreEnabled();
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 rounded-3xl bg-navy-deep p-6 text-white sm:flex-row sm:items-center sm:justify-between sm:p-8">
         <div>
           <h2 className="text-xl font-extrabold">Your enquiries</h2>
-          <p className="mt-1 text-sm text-white/75">Our team updates the status here as they call you back.</p>
+          <p className="mt-1 text-sm text-white/75">
+            Our team updates the status here as they call you back.
+          </p>
         </div>
-        <Link
-          href="/collections/laptops"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-ember px-5 text-sm font-bold text-white transition-colors hover:bg-white hover:text-navy-deep"
-        >
-          Browse laptops <ArrowRight className="size-4" />
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {storeEnabled && (
+            <Link
+              href="/orders"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-white/10 px-5 text-sm font-bold text-white transition-colors hover:bg-white hover:text-navy-deep"
+            >
+              My orders
+            </Link>
+          )}
+          <Link
+            href="/collections/laptops"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-ember px-5 text-sm font-bold text-white transition-colors hover:bg-white hover:text-navy-deep"
+          >
+            Browse laptops <ArrowRight className="size-4" />
+          </Link>
+        </div>
       </div>
 
       {error ? (
-        <StateCard icon={WifiOff} tone="error" title="We couldn't load your enquiries" body="Check your connection and try again. Your enquiries are safe.">
+        <StateCard
+          icon={WifiOff}
+          tone="error"
+          title="We couldn't load your enquiries"
+          body="Check your connection and try again. Your enquiries are safe."
+        >
           <button type="button" onClick={retry} className={stateBtn.primary}>
             <RotateCw className="size-4" /> Try again
           </button>
@@ -77,7 +96,9 @@ export function BuyerView({ uid }: { uid: string }) {
                       </div>
                     ))}
                 </dl>
-                <p className="mt-auto pt-4 text-xs text-muted-foreground">{i.createdAt ? `Sent ${relativeTime(i.createdAt, now)}` : ""}</p>
+                <p className="mt-auto pt-4 text-xs text-muted-foreground">
+                  {i.createdAt ? `Sent ${relativeTime(i.createdAt, now)}` : ""}
+                </p>
               </motion.li>
             ))}
           </AnimatePresence>

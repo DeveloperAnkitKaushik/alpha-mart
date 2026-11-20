@@ -4,6 +4,9 @@ import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { Copy, Sparkles, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
+import { AddToCart } from "@/components/store/add-to-cart";
+import { FavoriteButton } from "@/components/store/favorite-button";
+import { useStoreEnabled } from "@/components/store/store-flag";
 import { LeadDialog } from "@/components/site/lead-dialog";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { formatPrice } from "@/lib/data";
@@ -37,6 +40,7 @@ function Options({ label, values, value, onChange }: { label: string; values: st
 
 export function ProductBuyBox({ deal }: { deal: Deal }) {
   const { types, sale } = useSiteContent();
+  const store = useStoreEnabled();
   const type = findType(types, deal);
   const groups = offeredOptions(type, deal);
   // One picked index per option group; the cheapest value is the default.
@@ -61,13 +65,16 @@ export function ProductBuyBox({ deal }: { deal: Deal }) {
 
   return (
     <div>
-      <h1 className="text-2xl leading-snug font-extrabold text-foreground sm:text-3xl">{deal.name} | Refurbished</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="text-2xl leading-snug font-extrabold text-foreground sm:text-3xl">{deal.name} | Refurbished</h1>
+        <FavoriteButton productId={deal.id} className="shrink-0" />
+      </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
         <span className="flex items-center gap-1 font-semibold">
           <Star className="size-4 fill-amber-400 text-amber-400" /> {deal.rating.toFixed(1)}
           <span className="font-normal text-muted-foreground">({deal.reviews} ratings)</span>
         </span>
-        <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">In stock</span>
+        {!store && <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">In stock</span>}
       </div>
 
       <motion.p key={price} initial={{ opacity: 0.4, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-5 flex flex-wrap items-baseline gap-3">
@@ -108,6 +115,8 @@ export function ProductBuyBox({ deal }: { deal: Deal }) {
           )}
         </div>
       )}
+
+      <AddToCart deal={deal} options={Object.fromEntries(groups.map((g, i) => [g.name, g.values[picks[i] ?? 0]]))} />
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <LeadDialog product={product} className="h-12 rounded-xl bg-navy text-base hover:bg-navy-deep" />

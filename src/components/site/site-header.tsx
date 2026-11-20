@@ -7,6 +7,7 @@ import { Menu, Mic, Phone, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { HeaderNav } from "@/components/site/header-nav";
 import { Wordmark } from "@/components/site/wordmark";
+import { HeaderStoreIcons } from "@/components/store/header-store-icons";
 import { MobileMenu } from "@/components/site/mobile-menu";
 import { useAuth } from "@/lib/auth-store";
 
@@ -87,6 +88,7 @@ export function SiteHeader() {
                 <strong className="text-xs">Chat on WhatsApp</strong>
               </span>
             </a>
+            <HeaderStoreIcons iconClass={iconBtn} />
             <AuthButton />
           </div>
         </div>
