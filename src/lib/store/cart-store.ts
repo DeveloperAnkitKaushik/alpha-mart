@@ -1,12 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { z } from "zod";
 import { useAuth } from "@/lib/auth-store";
-import { getDb, isFirebaseConfigured } from "@/lib/firebase";
 import { watchFavorites } from "./client-data";
 import { addLines, mergeCarts } from "./cart-merge";
 import { cartLineSchema, type CartLine } from "./schemas";
+import { getCart, saveCart } from "./user-data-actions";
 
 const MAX_QTY = 10;
 const MAX_LINES = 30;
@@ -54,27 +52,21 @@ export const useCart = create<CartState>()(
 
 export const useCartCount = () => useCart((s) => s.lines.reduce((n, l) => n + l.qty, 0));
 
-const cartDoc = (uid: string) => doc(getDb(), "carts", uid);
-const remoteCart = z.object({ items: z.array(z.unknown()) });
-
-const pushCart = (uid: string, lines: CartLine[]) =>
-  setDoc(cartDoc(uid), { items: lines.slice(0, MAX_LINES) });
+const pushCart = (lines: CartLine[]) => saveCart(lines.slice(0, MAX_LINES));
 
 let started = false;
 export function startCartSync() {
   if (started) return;
   started = true;
   useCart.persist.rehydrate();
-  if (!isFirebaseConfigured) return;
 
   let syncUid: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   useCart.subscribe((s) => {
     if (!syncUid) return;
-    const uid = syncUid;
     clearTimeout(timer);
-    timer = setTimeout(() => void pushCart(uid, s.lines).catch(() => {}), 800);
+    timer = setTimeout(() => void pushCart(s.lines).catch(() => {}), 800);
   });
 
   let lastUid: string | null = null;
@@ -86,10 +78,9 @@ export function startCartSync() {
     watchFavorites(uid);
     if (!uid) return;
     try {
-      const snap = await getDoc(cartDoc(uid));
+      const remote = await getCart();
       if (lastUid !== uid) return;
-      const remote = remoteCart.safeParse(snap.data());
-      const merged = mergeCarts(remote.success ? parseLines(remote.data.items) : [], useCart.getState().lines);
+      const merged = mergeCarts(remote, useCart.getState().lines);
       syncUid = uid;
       useCart.setState({ lines: merged });
     } catch {

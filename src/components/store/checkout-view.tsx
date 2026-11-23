@@ -21,16 +21,15 @@ function Checkout({ uid }: { uid: string }) {
   const parsed = raw ? couponCodeSchema.safeParse(raw) : null;
   const code = parsed?.success ? parsed.data : null;
   const result = useTotals(lines, code);
-  const profile = useQuery({ queryKey: ["profile", uid], queryFn: () => loadProfile(uid).catch(() => null) });
+  const profile = useQuery({ queryKey: ["profile", uid], queryFn: () => loadProfile().catch(() => null) });
   const [paying, setPaying] = useState(false);
 
   const pay = async (address: Address) => {
-    const user = useAuth.getState().user;
-    if (!user || paying) return;
+    if (!useAuth.getState().user || paying) return;
     setPaying(true);
     try {
-      await saveProfile(uid, address).catch(() => {});
-      const order = await createOrder(await user.getIdToken(), lines, code, address);
+      await saveProfile(address).catch(() => {});
+      const order = await createOrder(lines, code, address);
       if (order.ok) {
         window.location.href = order.checkoutUrl;
         return;

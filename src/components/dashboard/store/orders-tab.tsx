@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/data";
 import { listOrders } from "@/lib/store/admin-actions";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/store/order-state";
 import { OrderStatusBadge } from "../badges";
-import { AdminError, adminToken, unwrap } from "./admin-call";
+import { AdminError, unwrap } from "./admin-call";
 import { OrderDrawer } from "./order-drawer";
 
 const FILTERS: (OrderStatus | "all")[] = ["all", ...ORDER_STATUSES];
@@ -21,7 +21,7 @@ export function OrdersTab() {
   const [openId, setOpenId] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["admin-orders", status],
-    queryFn: async () => unwrap(await listOrders(await adminToken(), status)).orders,
+    queryFn: async () => unwrap(await listOrders(status)).orders,
     retry: false,
   });
   const open = q.data?.find((o) => o.id === openId) ?? null;

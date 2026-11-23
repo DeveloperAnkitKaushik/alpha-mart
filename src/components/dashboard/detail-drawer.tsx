@@ -2,21 +2,26 @@
 
 import { useState } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth-store";
-import { STATUSES, updateItem, type InboxItem, type Status } from "@/lib/dashboard-api";
+import { STATUSES, type InboxItem, type Status } from "@/lib/dashboard-api";
+import { updateInboxItem } from "@/lib/inbox-actions";
 import { STATUS_LABEL } from "@/lib/inbox";
 import { ContactLinks, KindBadge } from "./badges";
+import { INBOX_KEY } from "./use-inbox";
 
 function Editor({ item }: { item: InboxItem }) {
   const [status, setStatus] = useState<Status>(item.status);
   const [notes, setNotes] = useState(item.notes);
+  const queryClient = useQueryClient();
   const save = useMutation({
-    mutationFn: () => updateItem(item, { status, notes: notes.trim() }, useAuth.getState().user?.uid ?? ""),
-    onSuccess: () => toast.success("Saved"),
+    mutationFn: () => updateInboxItem(item.coll, item.id, { status, notes: notes.trim() }),
+    onSuccess: () => {
+      toast.success("Saved");
+      void queryClient.invalidateQueries({ queryKey: INBOX_KEY });
+    },
     onError: () => toast.error("Could not save. Check your staff access."),
   });
   const dirty = status !== item.status || notes.trim() !== item.notes;

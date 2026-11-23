@@ -1,60 +1,67 @@
 import { create } from "zustand";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-  signInWithPopup,
-  signOut,
-  type User,
-} from "firebase/auth";
-import { FirebaseError } from "firebase/app";
-import { getFirebaseAuth, isFirebaseConfigured } from "./firebase";
+import { createAuthClient } from "better-auth/client";
+
+export interface AuthUser {
+  uid: string;
+  email: string;
+}
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   ready: boolean;
 }
 
-export const useAuth = create<AuthState>(() => ({ user: null, ready: !isFirebaseConfigured }));
+const authClient = createAuthClient();
+
+export const useAuth = create<AuthState>(() => ({ user: null, ready: false }));
 
 let started = false;
 export function startAuthListener() {
-  if (started || !isFirebaseConfigured) return;
+  if (started) return;
   started = true;
-  onAuthStateChanged(getFirebaseAuth(), (user) => useAuth.setState({ user, ready: true }));
+  authClient.useSession.subscribe(({ data, isPending }) => {
+    if (isPending) return;
+    useAuth.setState({ user: data ? { uid: data.user.id, email: data.user.email } : null, ready: true });
+  });
 }
 
-export const signInWithGoogle = () =>
-  signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
-export const signOutUser = () => signOut(getFirebaseAuth());
+// Better Auth returns { error } instead of throwing; throw so callers keep one error path.
+async function call<T extends { error: { code?: string; message?: string; status: number } | null }>(p: Promise<T>): Promise<T> {
+  const res = await p;
+  if (res.error) throw new AuthClientError(res.error.code ?? (res.error.status === 429 ? "TOO_MANY_REQUESTS" : ""), res.error.message);
+  return res;
+}
 
-export const signInWithEmail = (email: string, password: string) =>
-  signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+export class AuthClientError extends Error {
+  constructor(
+    readonly code: string,
+    message?: string,
+  ) {
+    super(message ?? code);
+  }
+}
+
+export const signOutUser = () => call(authClient.signOut());
+
+export const signInWithEmail = (email: string, password: string) => call(authClient.signIn.email({ email, password }));
 export const signUpWithEmail = (email: string, password: string) =>
-  createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+  call(authClient.signUp.email({ email, password, name: email.split("@")[0] ?? email }));
 
-export const resetPassword = (email: string) => sendPasswordResetEmail(getFirebaseAuth(), email);
+export const resetPassword = (email: string) =>
+  call(authClient.requestPasswordReset({ email, redirectTo: `${window.location.origin}/reset-password` }));
+export const setNewPassword = (token: string, newPassword: string) => call(authClient.resetPassword({ token, newPassword }));
 
 const AUTH_ERRORS: Record<string, string> = {
-  "auth/invalid-credential": "Email or password is incorrect.",
-  "auth/wrong-password": "Email or password is incorrect.",
-  "auth/user-not-found": "No account with this email. Create one instead.",
-  "auth/email-already-in-use": "An account with this email already exists. Sign in instead.",
-  "auth/weak-password": "Use at least 6 characters for your password.",
-  "auth/invalid-email": "Enter a valid email address.",
-  "auth/missing-password": "Enter your password.",
-  "auth/too-many-requests": "Too many attempts. Try again in a few minutes.",
-  "auth/network-request-failed": "You seem to be offline. Check your connection.",
-  "auth/unauthorized-domain": "Google sign-in isn't enabled for this site address yet.",
-  "auth/operation-not-allowed": "This sign-in method is turned off in Firebase. Enable it under Authentication → Sign-in method.",
-  "auth/configuration-not-found": "Sign-in isn't set up in Firebase yet. Enable a provider under Authentication → Sign-in method.",
+  INVALID_EMAIL_OR_PASSWORD: "Email or password is incorrect.",
+  USER_ALREADY_EXISTS: "An account with this email already exists. Sign in instead.",
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: "An account with this email already exists. Sign in instead.",
+  PASSWORD_TOO_SHORT: "Use at least 6 characters for your password.",
+  INVALID_EMAIL: "Enter a valid email address.",
+  INVALID_TOKEN: "This reset link has expired. Ask for a new one.",
+  TOO_MANY_REQUESTS: "Too many attempts. Try again in a few minutes.",
 };
 
-// Returns null when the user simply closed the Google popup, so no error is shown.
-export function authErrorMessage(e: unknown): string | null {
-  const code = e instanceof FirebaseError ? e.code : "";
-  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return null;
-  return AUTH_ERRORS[code] ?? `Something went wrong${code ? ` (${code})` : ""}. Please try again.`;
+export function authErrorMessage(e: unknown): string {
+  if (e instanceof AuthClientError) return AUTH_ERRORS[e.code] ?? "Something went wrong. Please try again.";
+  return "You seem to be offline. Check your connection.";
 }

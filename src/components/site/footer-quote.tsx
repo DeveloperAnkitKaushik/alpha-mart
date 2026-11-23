@@ -38,9 +38,7 @@ export function FooterQuote() {
           <CheckCircle2 className="size-9 shrink-0 text-emerald-600" />
           <div>
             <p className="font-semibold text-navy-deep">Request received</p>
-            <p className="text-sm text-navy-deep/70">
-              {mutation.data.demo ? "Demo mode: nothing was saved." : "We will call you back shortly."}
-            </p>
+            <p className="text-sm text-navy-deep/70">We will call you back shortly.</p>
           </div>
         </motion.div>
       ) : (

@@ -49,9 +49,7 @@ export function RequirementForm() {
         <CheckCircle2 className="size-12 text-brand" />
         <h2 className="text-xl font-semibold">Requirement posted</h2>
         <p className="text-muted-foreground">
-          {mutation.data.demo
-            ? "Demo mode: Firebase is not configured, so nothing was saved."
-            : "Matching suppliers will reach out to you shortly."}
+          Matching suppliers will reach out to you shortly.
         </p>
       </motion.div>
     );

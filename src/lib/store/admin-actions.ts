@@ -1,9 +1,11 @@
 "use server";
 
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { adminAuth, adminDb, AuthError, requireAdmin } from "@/lib/server/firebase-admin";
-import { sweepExpired, toOrderView, type OrderDoc, type OrderView } from "@/lib/server/orders";
+import { AuthError, requireAdmin } from "@/lib/server/auth";
+import { db } from "@/lib/server/db";
+import { coupons, orders, stock, user } from "@/lib/server/db/schema";
+import { moveStock, sweepExpired, toOrderDoc, toOrderView, type OrderView } from "@/lib/server/orders";
 import { couponDiscount } from "@/lib/store/pricing";
 import { ORDER_STATUSES, staffEffect, type OrderStatus } from "@/lib/store/order-state";
 import { couponCodeSchema, couponSchema, type Coupon } from "@/lib/store/schemas";
@@ -15,13 +17,11 @@ const NOT_ADMIN: Failure = { ok: false, error: "Your session expired or this acc
 const orderIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
 const statusSchema = z.enum(ORDER_STATUSES);
 const couponInputSchema = couponSchema.omit({ uses: true });
-// Matches useStock(): a missing or malformed doc reads as 0, negatives as 0.
-const stockDocSchema = z.object({ available: z.number().int() });
 
 // Turns an AuthError into the shared failure; anything else is a real fault and rethrows.
-async function asAdmin<T>(idToken: unknown, run: () => Promise<T>): Promise<T | Failure> {
+async function asAdmin<T>(run: () => Promise<T>): Promise<T | Failure> {
   try {
-    await requireAdmin(idToken);
+    await requireAdmin();
     return await run();
   } catch (e) {
     if (e instanceof AuthError) return NOT_ADMIN;
@@ -30,101 +30,92 @@ async function asAdmin<T>(idToken: unknown, run: () => Promise<T>): Promise<T | 
 }
 
 export async function listOrders(
-  idToken: string,
   status: OrderStatus | "all",
 ): Promise<{ ok: true; orders: (OrderView & { email: string | null })[] } | Failure> {
   const filter = z.union([statusSchema, z.literal("all")]).safeParse(status);
   if (!filter.success) return { ok: false, error: "Unknown status filter." };
-  return asAdmin(idToken, async () => {
+  return asAdmin(async () => {
     await sweepExpired();
-    const orders = adminDb().collection("orders");
-    // shortcut: a status filter reads every match and sorts here to avoid a composite index; add one if a status grows past a few thousand orders.
-    const docs =
-      filter.data === "all"
-        ? (await orders.orderBy("createdAt", "desc").limit(100).get()).docs
-        : (await orders.where("status", "==", filter.data).get()).docs
-            .sort((a, b) => b.get("createdAt").toMillis() - a.get("createdAt").toMillis())
-            .slice(0, 100);
-    const uids = [...new Set(docs.map((d) => (d.data() as OrderDoc).uid))];
-    const emails = new Map<string, string | null>();
-    if (uids.length) {
-      for (const u of (await adminAuth().getUsers(uids.map((uid) => ({ uid })))).users) emails.set(u.uid, u.email ?? null);
-    }
+    const rows = await db()
+      .select()
+      .from(orders)
+      .where(filter.data === "all" ? undefined : eq(orders.status, filter.data))
+      .orderBy(desc(orders.createdAt))
+      .limit(100);
+    const uids = [...new Set(rows.map((r) => r.uid))];
+    const emails = new Map(
+      uids.length ? (await db().select({ id: user.id, email: user.email }).from(user).where(inArray(user.id, uids))).map((u) => [u.id, u.email]) : [],
+    );
     return {
       ok: true as const,
-      orders: docs.map((d) => {
-        const { uid, ...order } = d.data() as OrderDoc;
-        return { ...toOrderView(d.id, order), email: emails.get(uid) ?? null };
+      orders: rows.map((r) => {
+        const { uid, ...order } = toOrderDoc(r);
+        return { ...toOrderView(r.id, order), email: emails.get(uid) ?? null };
       }),
     };
   });
 }
 
-export async function setOrderStatus(idToken: string, orderId: string, to: OrderStatus, trackingNote: string): Promise<Result> {
+export async function setOrderStatus(orderId: string, to: OrderStatus, trackingNote: string): Promise<Result> {
   const input = z.object({ orderId: orderIdSchema, to: statusSchema, note: z.string().trim().max(300) }).safeParse({ orderId, to, note: trackingNote });
   if (!input.success) return { ok: false, error: "Check the status and note (300 characters max)." };
-  return asAdmin(idToken, () =>
-    adminDb().runTransaction(async (tx): Promise<Result> => {
-      const db = adminDb();
-      const ref = db.doc(`orders/${input.data.orderId}`);
-      const snap = await tx.get(ref);
-      if (!snap.exists) return { ok: false, error: "Order not found." };
-      const order = snap.data() as OrderDoc;
+  return asAdmin(() =>
+    db().transaction(async (tx): Promise<Result> => {
+      const where = eq(orders.id, input.data.orderId);
+      const [order] = await tx.select({ status: orders.status, items: orders.items }).from(orders).where(where).limit(1).for("update");
+      if (!order) return { ok: false, error: "Order not found." };
       const effect = staffEffect(order.status, input.data.to);
       if (!effect.ok) return { ok: false, error: "This order can't move to that status. Reload and try again." };
-      if (effect.restock) {
-        const qty = new Map<string, number>();
-        for (const l of order.items) qty.set(l.productId, (qty.get(l.productId) ?? 0) + l.qty);
-        for (const [id, n] of qty) {
-          tx.set(db.doc(`stock/${id}`), { available: FieldValue.increment(n), updatedAt: Timestamp.now() }, { merge: true });
-        }
-      }
-      tx.update(ref, { status: input.data.to, trackingNote: input.data.note, updatedAt: Timestamp.now() });
+      if (effect.restock) await moveStock(tx, order.items, 1);
+      await tx.update(orders).set({ status: input.data.to, trackingNote: input.data.note, updatedAt: new Date() }).where(where);
       return { ok: true };
     }),
   );
 }
 
 // Compare-and-set: a checkout between page load and save would otherwise be overwritten and oversold.
-export async function setStock(idToken: string, productId: string, available: number, expected: number): Promise<Result> {
+export async function setStock(productId: string, available: number, expected: number): Promise<Result> {
   const input = z
     .object({ id: z.string().min(1).max(80), n: z.number().int().min(0).max(999), expected: z.number().int().min(0) })
     .safeParse({ id: productId, n: available, expected });
   if (!input.success) return { ok: false, error: "Stock must be a whole number from 0 to 999." };
-  return asAdmin(idToken, () =>
-    adminDb().runTransaction(async (tx): Promise<Result> => {
-      const ref = adminDb().doc(`stock/${input.data.id}`);
-      const current = Math.max(0, stockDocSchema.safeParse((await tx.get(ref)).data()).data?.available ?? 0);
-      if (current !== input.data.expected) return { ok: false, error: "Stock changed since you loaded this page. Refresh and try again." };
-      tx.set(ref, { available: input.data.n, updatedAt: Timestamp.now() }, { merge: true });
+  return asAdmin(() =>
+    db().transaction(async (tx): Promise<Result> => {
+      const [row] = await tx.select({ available: stock.available }).from(stock).where(eq(stock.productId, input.data.id)).limit(1).for("update");
+      // Matches useStock(): a missing row reads as 0, negatives as 0.
+      if (Math.max(0, row?.available ?? 0) !== input.data.expected) {
+        return { ok: false, error: "Stock changed since you loaded this page. Refresh and try again." };
+      }
+      const set = { available: input.data.n, updatedAt: new Date() };
+      await tx.insert(stock).values({ productId: input.data.id, ...set }).onDuplicateKeyUpdate({ set });
       return { ok: true };
     }),
   );
 }
 
-export async function listCoupons(idToken: string): Promise<{ ok: true; coupons: (Coupon & { code: string })[] } | Failure> {
-  return asAdmin(idToken, async () => {
-    const snap = await adminDb().collection("coupons").get();
-    const coupons = snap.docs.flatMap((d) => {
-      const c = couponSchema.safeParse(d.data());
-      return c.success ? [{ ...c.data, code: d.id }] : [];
+export async function listCoupons(): Promise<{ ok: true; coupons: (Coupon & { code: string })[] } | Failure> {
+  return asAdmin(async () => {
+    const rows = await db().select().from(coupons).orderBy(coupons.code);
+    const list = rows.flatMap((r) => {
+      const c = couponSchema.safeParse(r);
+      return c.success ? [{ ...c.data, code: r.code }] : [];
     });
-    return { ok: true as const, coupons: coupons.sort((a, b) => a.code.localeCompare(b.code)) };
+    return { ok: true as const, coupons: list };
   });
 }
 
-export async function saveCoupon(idToken: string, code: string, coupon: Omit<Coupon, "uses">): Promise<Result> {
+export async function saveCoupon(code: string, coupon: Omit<Coupon, "uses">): Promise<Result> {
   const id = couponCodeSchema.safeParse(code);
   const data = couponInputSchema.safeParse(coupon);
   if (!id.success) return { ok: false, error: "Code must be 3 to 20 letters or digits." };
   if (!data.success) return { ok: false, error: data.error.issues[0]?.message ?? "Some coupon fields are invalid." };
-  return asAdmin(idToken, () => {
-    const ref = adminDb().doc(`coupons/${id.data}`);
-    return adminDb().runTransaction(async (tx): Promise<Result> => {
-      const uses = z.number().int().min(0).safeParse((await tx.get(ref)).get("uses")).data ?? 0;
-      tx.set(ref, { ...data.data, uses });
-      return { ok: true };
-    });
+  // The upsert leaves `uses` untouched on an existing coupon, so redemptions survive an edit.
+  return asAdmin(async (): Promise<Result> => {
+    await db()
+      .insert(coupons)
+      .values({ ...data.data, code: id.data, uses: 0 })
+      .onDuplicateKeyUpdate({ set: data.data });
+    return { ok: true };
   });
 }
 
@@ -132,6 +123,7 @@ export async function saveCoupon(idToken: string, code: string, coupon: Omit<Cou
 export async function couponExists(code: string): Promise<boolean> {
   const id = couponCodeSchema.safeParse(code);
   if (!id.success) return false;
-  const coupon = couponSchema.safeParse((await adminDb().doc(`coupons/${id.data}`).get()).data());
+  const [row] = await db().select().from(coupons).where(eq(coupons.code, id.data)).limit(1);
+  const coupon = couponSchema.safeParse(row);
   return coupon.success && couponDiscount(coupon.data, id.data, coupon.data.minOrder, new Date(), false).ok;
 }

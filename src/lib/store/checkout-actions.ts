@@ -2,10 +2,14 @@
 
 import { z } from "zod";
 import { loadCatalog } from "@/lib/server/catalog";
+import { desc, eq } from "drizzle-orm";
+import { AuthError, currentUser, isAdminId, requireUser } from "@/lib/server/auth";
+import { db } from "@/lib/server/db";
+import { orders } from "@/lib/server/db/schema";
 import { serverEnv } from "@/lib/server/env";
-import { adminDb, AuthError, requireUser } from "@/lib/server/firebase-admin";
-import { customerUsedCoupon, quoteCoupon, reconcileOrder, reserveOrder, settleOrder, sweepExpired, toOrderView, type OrderDoc, type OrderView } from "@/lib/server/orders";
+import { customerUsedCoupon, quoteCoupon, reconcileOrder, reserveOrder, settleOrder, sweepExpired, toOrderDoc, toOrderView, type OrderView } from "@/lib/server/orders";
 import { createPayment } from "@/lib/server/phonepe";
+import type { OrderStatus } from "@/lib/store/order-state";
 import { priceLines, type PricedLine } from "@/lib/store/pricing";
 import { addressSchema, cartLineSchema, couponCodeSchema, type CartLine } from "@/lib/store/schemas";
 
@@ -38,14 +42,13 @@ function parseCart(lines: unknown, code: unknown): { ok: true; lines: CartLine[]
 }
 
 export async function previewTotals(
-  idToken: string | null,
   lines: unknown,
   code: unknown,
 ): Promise<{ ok: true; subtotal: number; discount: number; total: number; lines: PricedLine[] } | Failure> {
   if (storeOff()) return STORE_OFF;
   try {
     await sweepThrottled();
-    const uid = idToken ? await requireUser(idToken) : null;
+    const uid = (await currentUser())?.id ?? null;
     const cart = parseCart(lines, code);
     if (!cart.ok) return cart;
     const priced = priceLines(await loadCatalog(), cart.lines);
@@ -64,14 +67,13 @@ export async function previewTotals(
 }
 
 export async function createOrder(
-  idToken: string,
   lines: unknown,
   code: unknown,
   address: unknown,
 ): Promise<{ ok: true; checkoutUrl: string } | Failure> {
   if (storeOff()) return STORE_OFF;
   try {
-    const uid = await requireUser(idToken);
+    const uid = await requireUser();
     const cart = parseCart(lines, code);
     if (!cart.ok) return cart;
     const addr = addressSchema.safeParse(address);
@@ -102,7 +104,7 @@ export async function createOrder(
       return { ok: false, error: "PhonePe is not responding. Nothing was charged, try again." };
     }
     // Saved so the order page can resume the payment; the customer is redirected even if this write fails.
-    await adminDb().doc(`orders/${order.orderId}`).update({ checkoutUrl }).catch(() => undefined);
+    await db().update(orders).set({ checkoutUrl }).where(eq(orders.id, order.orderId)).catch(() => undefined);
     return { ok: true, checkoutUrl };
   } catch (e) {
     if (e instanceof AuthError) return SESSION_EXPIRED;
@@ -111,24 +113,40 @@ export async function createOrder(
 }
 
 export async function getMyOrder(
-  idToken: string,
   orderId: string,
 ): Promise<{ ok: true; order: OrderView } | { ok: false; error: "not_found" | "auth" }> {
   try {
-    const uid = await requireUser(idToken);
+    const uid = await requireUser();
     if (typeof orderId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(orderId)) return { ok: false, error: "not_found" };
-    const ref = adminDb().doc(`orders/${orderId}`);
-    let snap = await ref.get();
-    if (!snap.exists) return { ok: false, error: "not_found" };
-    let { uid: owner, ...order } = snap.data() as OrderDoc;
-    if (owner !== uid && !(await adminDb().doc(`admins/${uid}`).get()).exists) return { ok: false, error: "not_found" };
-    if (order.status === "pending_payment" || order.status === "expired") {
+    const read = async () => (await db().select().from(orders).where(eq(orders.id, orderId)).limit(1))[0];
+    let row = await read();
+    if (!row) return { ok: false, error: "not_found" };
+    if (row.uid !== uid && !(await isAdminId(uid))) return { ok: false, error: "not_found" };
+    if (row.status === "pending_payment" || row.status === "expired") {
       // PhonePe being unreachable must not hide the order; the page keeps polling.
       await reconcileOrder(orderId).catch(() => undefined);
-      snap = await ref.get();
-      ({ uid: owner, ...order } = snap.data() as OrderDoc);
+      row = (await read()) ?? row;
     }
+    const { uid: owner, ...order } = toOrderDoc(row);
     return { ok: true, order: toOrderView(orderId, order, owner === uid) };
+  } catch (e) {
+    if (e instanceof AuthError) return { ok: false, error: "auth" };
+    throw e;
+  }
+}
+
+export async function listMyOrders(): Promise<
+  { ok: true; orders: { id: string; total: number; status: OrderStatus; createdAt: string }[] } | { ok: false; error: "auth" }
+> {
+  try {
+    const uid = await requireUser();
+    const rows = await db()
+      .select({ id: orders.id, total: orders.total, status: orders.status, createdAt: orders.createdAt })
+      .from(orders)
+      .where(eq(orders.uid, uid))
+      .orderBy(desc(orders.createdAt))
+      .limit(50);
+    return { ok: true, orders: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) };
   } catch (e) {
     if (e instanceof AuthError) return { ok: false, error: "auth" };
     throw e;

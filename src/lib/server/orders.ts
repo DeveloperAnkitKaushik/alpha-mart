@@ -1,6 +1,7 @@
-import { FieldValue, Timestamp, type DocumentSnapshot, type Transaction } from "firebase-admin/firestore";
-import { z } from "zod";
-import { adminDb } from "@/lib/server/firebase-admin";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { db, type Db, type Tx } from "@/lib/server/db";
+import { coupons, orders, stock } from "@/lib/server/db/schema";
+import { randomId } from "@/lib/server/random-id";
 import { getPaymentState, PaymentNotFoundError } from "@/lib/server/phonepe";
 import { paymentEffect, type OrderStatus, type PgState } from "@/lib/store/order-state";
 import { checkStock, couponDiscount, type PricedLine } from "@/lib/store/pricing";
@@ -16,9 +17,9 @@ export type OrderDoc = {
   address: Address;
   status: OrderStatus;
   phonepe: { state: PgState | null; transactionId: string | null };
-  reservedUntil: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  reservedUntil: Date;
+  createdAt: Date;
+  updatedAt: Date;
   trackingNote: string;
   checkoutUrl?: string;
 };
@@ -31,16 +32,22 @@ export type OrderView = Omit<OrderDoc, "uid" | "reservedUntil" | "createdAt" | "
   checkoutUrl: string | null;
 };
 
+type OrderRow = typeof orders.$inferSelect;
+
+export function toOrderDoc({ pgState, pgTransactionId, checkoutUrl, ...row }: OrderRow): OrderDoc {
+  return { ...row, phonepe: { state: pgState, transactionId: pgTransactionId }, ...(checkoutUrl ? { checkoutUrl } : {}) };
+}
+
 // The PhonePe link goes only to the order's owner, and only while the hold is live.
 export function toOrderView(id: string, { checkoutUrl, ...order }: Omit<OrderDoc, "uid">, isOwner = false): OrderView {
-  const payable = isOwner && order.status === "pending_payment" && order.reservedUntil.toMillis() > Date.now();
+  const payable = isOwner && order.status === "pending_payment" && order.reservedUntil.getTime() > Date.now();
   return {
     ...order,
     id,
     checkoutUrl: payable ? (checkoutUrl ?? null) : null,
-    reservedUntil: order.reservedUntil.toDate().toISOString(),
-    createdAt: order.createdAt.toDate().toISOString(),
-    updatedAt: order.updatedAt.toDate().toISOString(),
+    reservedUntil: order.reservedUntil.toISOString(),
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
   };
 }
 
@@ -53,13 +60,13 @@ const HOLD_MS = 20 * 60 * 1000;
 const HOLDS_COUPON: OrderStatus[] = ["pending_payment", "paid", "packed", "shipped", "delivered"];
 // Expired stays here because a late payment can still complete it.
 const RECONCILABLE: OrderStatus[] = ["pending_payment", "expired"];
-const stockDoc = z.object({ available: z.number().int() });
 
-const orderRef = (id: string) => adminDb().doc(`orders/${id}`);
-const stockRef = (productId: string) => adminDb().doc(`stock/${productId}`);
-const couponRef = (code: string) => adminDb().doc(`coupons/${code}`);
+const readCoupon = (row: unknown): Coupon | null => couponSchema.safeParse(row).data ?? null;
 
-const readCoupon = (snap: DocumentSnapshot): Coupon | null => couponSchema.safeParse(snap.data()).data ?? null;
+async function couponRow(q: Tx | Db, code: string, lock: boolean) {
+  const query = q.select().from(coupons).where(eq(coupons.code, code)).limit(1);
+  return (await (lock ? query.for("update") : query))[0];
+}
 
 function qtyByProduct(lines: CartLine[]): Map<string, number> {
   const qty = new Map<string, number>();
@@ -67,28 +74,31 @@ function qtyByProduct(lines: CartLine[]): Map<string, number> {
   return qty;
 }
 
-// A missing or malformed stock doc counts as 0 available.
-async function readStock(tx: Transaction, lines: CartLine[]): Promise<Record<string, number>> {
+// A missing stock row counts as 0 available.
+async function readStock(tx: Tx, lines: CartLine[]): Promise<Record<string, number>> {
   const ids = [...qtyByProduct(lines).keys()];
-  const snaps = ids.length ? await tx.getAll(...ids.map(stockRef)) : [];
-  return Object.fromEntries(snaps.map((s) => [s.id, Math.max(0, stockDoc.safeParse(s.data()).data?.available ?? 0)]));
+  if (!ids.length) return {};
+  const rows = await tx.select({ id: stock.productId, available: stock.available }).from(stock).where(inArray(stock.productId, ids)).for("update");
+  return Object.fromEntries(rows.map((r) => [r.id, Math.max(0, r.available)]));
 }
 
-function moveStock(tx: Transaction, lines: CartLine[], sign: 1 | -1) {
-  for (const [id, qty] of qtyByProduct(lines)) {
-    tx.set(stockRef(id), { available: FieldValue.increment(sign * qty), updatedAt: Timestamp.now() }, { merge: true });
+export async function moveStock(tx: Tx, lines: CartLine[], sign: 1 | -1) {
+  const updatedAt = new Date();
+  for (const [productId, qty] of qtyByProduct(lines)) {
+    await tx
+      .insert(stock)
+      .values({ productId, available: sign * qty, updatedAt })
+      .onDuplicateKeyUpdate({ set: { available: sql`${stock.available} + ${sign * qty}`, updatedAt } });
   }
 }
 
 export async function customerUsedCoupon(uid: string, code: string): Promise<boolean> {
-  const used = await adminDb()
-    .collection("orders")
-    .where("uid", "==", uid)
-    .where("couponCode", "==", code)
-    .where("status", "in", HOLDS_COUPON)
-    .limit(1)
-    .get();
-  return !used.empty;
+  const used = await db()
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.uid, uid), eq(orders.couponCode, code), inArray(orders.status, HOLDS_COUPON)))
+    .limit(1);
+  return used.length > 0;
 }
 
 // Display-only quote; reserveOrder re-checks the coupon inside its transaction.
@@ -97,7 +107,7 @@ export async function quoteCoupon(
   code: string,
   subtotal: number,
 ): Promise<{ ok: true; discount: number } | Failure> {
-  const coupon = readCoupon(await couponRef(code).get());
+  const coupon = readCoupon(await couponRow(db(), code, false));
   const usedIt = coupon?.oncePerCustomer && uid ? await customerUsedCoupon(uid, code) : false;
   return couponDiscount(coupon, code, subtotal, new Date(), usedIt);
 }
@@ -110,16 +120,13 @@ export async function reserveOrder(o: {
   customerUsedIt: boolean;
   address: Address;
 }): Promise<{ ok: true; orderId: string; total: number } | Failure> {
-  const db = adminDb();
-  return db.runTransaction(async (tx): Promise<{ ok: true; orderId: string; total: number } | Failure> => {
+  return db().transaction(async (tx): Promise<{ ok: true; orderId: string; total: number } | Failure> => {
     const available = await readStock(tx, o.lines);
-    const couponSnap = o.code ? await tx.get(couponRef(o.code)) : null;
-
     const short = checkStock(o.lines, available, Object.fromEntries(o.lines.map((l) => [l.productId, l.name])));
     if (short) return { ok: false, error: short };
     let discount = 0;
-    if (o.code && couponSnap) {
-      const c = couponDiscount(readCoupon(couponSnap), o.code, o.subtotal, new Date(), o.customerUsedIt);
+    if (o.code) {
+      const c = couponDiscount(readCoupon(await couponRow(tx, o.code, true)), o.code, o.subtotal, new Date(), o.customerUsedIt);
       if (!c.ok) return c;
       discount = c.discount;
     }
@@ -127,11 +134,13 @@ export async function reserveOrder(o: {
     // PhonePe's minimum payment is ₹1.
     if (total < 1) return { ok: false, error: "This order total is too low to pay online" };
 
-    moveStock(tx, o.lines, -1);
-    if (o.code) tx.update(couponRef(o.code), { uses: FieldValue.increment(1) });
-    const ref = db.collection("orders").doc();
-    const now = Timestamp.now();
-    const order: OrderDoc = {
+    await moveStock(tx, o.lines, -1);
+    if (o.code) await tx.update(coupons).set({ uses: sql`${coupons.uses} + 1` }).where(eq(coupons.code, o.code));
+    // 20 alphanumerics: the PhonePe webhook validates this shape.
+    const orderId = randomId();
+    const now = new Date();
+    await tx.insert(orders).values({
+      id: orderId,
       uid: o.uid,
       items: o.lines,
       subtotal: o.subtotal,
@@ -140,14 +149,14 @@ export async function reserveOrder(o: {
       total,
       address: o.address,
       status: "pending_payment",
-      phonepe: { state: null, transactionId: null },
-      reservedUntil: Timestamp.fromMillis(now.toMillis() + HOLD_MS),
+      pgState: null,
+      pgTransactionId: null,
+      reservedUntil: new Date(now.getTime() + HOLD_MS),
       createdAt: now,
       updatedAt: now,
       trackingNote: "",
-    };
-    tx.create(ref, order);
-    return { ok: true, orderId: ref.id, total };
+    });
+    return { ok: true, orderId, total };
   });
 }
 
@@ -156,29 +165,31 @@ export async function settleOrder(
   orderId: string,
   pg: { state: PgState; transactionId: string | null },
 ): Promise<OrderStatus> {
-  return adminDb().runTransaction(async (tx) => {
-    const snap = await tx.get(orderRef(orderId));
-    if (!snap.exists) throw new OrderNotFoundError(orderId);
-    const order = snap.data() as OrderDoc;
+  return db().transaction(async (tx) => {
+    const [row] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1).for("update");
+    if (!row) throw new OrderNotFoundError(orderId);
+    const order = toOrderDoc(row);
     const paidLate = (order.status === "expired" || order.status === "failed") && pg.state === "COMPLETED";
     const stockAvailable = paidLate && checkStock(order.items, await readStock(tx, order.items), {}) === null;
-    const effect = paymentEffect(order.status, pg.state, order.reservedUntil.toMillis() < Date.now(), stockAvailable);
+    const effect = paymentEffect(order.status, pg.state, order.reservedUntil.getTime() < Date.now(), stockAvailable);
     if (effect.status === order.status) return order.status;
-    const coupon = effect.couponUses !== 0 && order.couponCode ? readCoupon(await tx.get(couponRef(order.couponCode))) : null;
+    const coupon = effect.couponUses !== 0 && order.couponCode ? readCoupon(await couponRow(tx, order.couponCode, true)) : null;
 
-    if (effect.stock !== "none") moveStock(tx, order.items, effect.stock === "release" ? 1 : -1);
+    if (effect.stock !== "none") await moveStock(tx, order.items, effect.stock === "release" ? 1 : -1);
     if (coupon && order.couponCode && coupon.uses + effect.couponUses >= 0) {
-      tx.update(couponRef(order.couponCode), { uses: FieldValue.increment(effect.couponUses) });
+      await tx.update(coupons).set({ uses: sql`${coupons.uses} + ${effect.couponUses}` }).where(eq(coupons.code, order.couponCode));
     }
-    tx.update(snap.ref, { status: effect.status, phonepe: pg, updatedAt: Timestamp.now() });
+    await tx
+      .update(orders)
+      .set({ status: effect.status, pgState: pg.state, pgTransactionId: pg.transactionId, updatedAt: new Date() })
+      .where(eq(orders.id, orderId));
     return effect.status;
   });
 }
 
 export async function reconcileOrder(orderId: string): Promise<OrderStatus> {
-  const snap = await orderRef(orderId).get();
-  if (!snap.exists) throw new OrderNotFoundError(orderId);
-  const order = snap.data() as OrderDoc;
+  const [order] = await db().select({ status: orders.status, reservedUntil: orders.reservedUntil }).from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) throw new OrderNotFoundError(orderId);
   if (!RECONCILABLE.includes(order.status)) return order.status;
   let pg: Awaited<ReturnType<typeof getPaymentState>>;
   try {
@@ -186,17 +197,18 @@ export async function reconcileOrder(orderId: string): Promise<OrderStatus> {
   } catch (e) {
     if (!(e instanceof PaymentNotFoundError)) throw e;
     // PhonePe never saw this order (we died before or during createPayment): release it once the hold lapses.
-    if (order.reservedUntil.toMillis() >= Date.now()) return order.status;
+    if (order.reservedUntil.getTime() >= Date.now()) return order.status;
     pg = { state: "FAILED", transactionId: null };
   }
   return settleOrder(orderId, pg);
 }
 
-// shortcut: unordered limit 50 with an in-code expiry filter avoids a composite index; add one if pending orders ever exceed 50.
 export async function sweepExpired(): Promise<void> {
-  const pending = await adminDb().collection("orders").where("status", "==", "pending_payment").limit(50).get();
-  const now = Date.now();
-  const expired = pending.docs.filter((d) => (d.data() as OrderDoc).reservedUntil.toMillis() < now);
+  const expired = await db()
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.status, "pending_payment"), lt(orders.reservedUntil, new Date())))
+    .limit(50);
   // A PhonePe outage must not block new checkouts; the next sweep retries.
-  await Promise.allSettled(expired.map((d) => reconcileOrder(d.id)));
+  await Promise.allSettled(expired.map((o) => reconcileOrder(o.id)));
 }

@@ -12,9 +12,8 @@ function HeartToggle({ productId, className }: { productId: string; className: s
   const router = useRouter();
 
   const onClick = () => {
-    const user = useAuth.getState().user;
-    if (!user) return router.push("/signin");
-    toggleFavorite(user.uid, productId).catch(() => toast.error("Couldn't update favourites. Try again."));
+    if (!useAuth.getState().user) return router.push("/signin");
+    toggleFavorite(productId).catch(() => toast.error("Couldn't update favourites. Try again."));
   };
 
   return (

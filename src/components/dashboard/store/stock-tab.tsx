@@ -7,13 +7,13 @@ import { useSiteContent } from "@/components/site/site-content";
 import { setStock } from "@/lib/store/admin-actions";
 import { useStock } from "@/lib/store/client-data";
 import { inputClass } from "../items/fields";
-import { adminToken, unwrap } from "./admin-call";
+import { unwrap } from "./admin-call";
 
 const Row = memo(function Row({ id, name, available }: { id: string; name: string; available: number }) {
   const [value, setValue] = useState(String(available));
   const client = useQueryClient();
   const save = useMutation({
-    mutationFn: async () => unwrap(await setStock(await adminToken(), id, Number(value), available)),
+    mutationFn: async () => unwrap(await setStock(id, Number(value), available)),
     onSuccess: () => {
       toast.success("Stock saved");
       void client.invalidateQueries({ queryKey: ["stock"] });

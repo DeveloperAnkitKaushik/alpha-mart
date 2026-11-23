@@ -1,20 +1,18 @@
 import { z } from "zod";
 
-const serviceAccount = z
-  .string()
-  .min(1)
-  .transform((v, ctx) => {
-    try {
-      return z.record(z.string(), z.unknown()).parse(JSON.parse(Buffer.from(v, "base64").toString("utf8")));
-    } catch {
-      ctx.addIssue({ code: "custom", message: "invalid base64 service account JSON" });
-      return z.NEVER;
-    }
-  });
-
 const serverSchema = z.object({
-  FIREBASE_SERVICE_ACCOUNT: serviceAccount,
+  DATABASE_URL: z.string().startsWith("mysql://"),
+  BETTER_AUTH_SECRET: z.string().min(32),
   SITE_URL: z.url().transform((u) => u.replace(/\/+$/, "")),
+});
+
+// Optional: without it, reset emails fail with a clear error.
+const smtpSchema = z.object({
+  SMTP_HOST: z.string().min(1),
+  SMTP_PORT: z.coerce.number().int(),
+  SMTP_USER: z.string().min(1),
+  SMTP_PASS: z.string().min(1),
+  MAIL_FROM: z.string().min(3),
 });
 
 const phonepeSchema = z.object({
@@ -42,3 +40,4 @@ function lazy<S extends z.ZodType>(schema: S): () => z.output<S> {
 // Only successes are memoised, so a failed read never sticks.
 export const serverEnv = lazy(serverSchema);
 export const phonepeEnv = lazy(phonepeSchema);
+export const smtpEnv = () => smtpSchema.safeParse(process.env).data ?? null;

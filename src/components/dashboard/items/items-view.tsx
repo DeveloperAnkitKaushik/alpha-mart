@@ -7,7 +7,6 @@ import { Eye, EyeOff, Loader2, RotateCcw, UploadCloud } from "lucide-react";
 import { Tabs } from "@base-ui/react/tabs";
 import { TabBar } from "../tab-bar";
 import { useSiteContent } from "@/components/site/site-content";
-import { getFirebaseAuth } from "@/lib/firebase";
 import { publishSiteContent } from "@/lib/publish-content";
 import { siteContentSchema, type SiteContent } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
@@ -79,8 +78,7 @@ function PublishBar({ onIssue }: { onIssue: (tab: Section) => void }) {
     }
     setBusy(true);
     try {
-      const token = await getFirebaseAuth().currentUser?.getIdToken();
-      const res = await publishSiteContent(token, parsed.data);
+      const res = await publishSiteContent(parsed.data);
       if (!res.ok) {
         toast.error("Not published", { description: res.error });
         return;

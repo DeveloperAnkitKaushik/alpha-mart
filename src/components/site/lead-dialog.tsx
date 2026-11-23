@@ -25,10 +25,8 @@ export function LeadDialog({ product, className }: { product: Product; className
 
   const mutation = useMutation({
     mutationFn: createLead,
-    onSuccess: ({ demo }) => {
-      toast.success(`Request sent to ${product.supplier.name}`, {
-        description: demo ? "Demo mode: Firebase is not configured, nothing was saved." : "They will contact you shortly.",
-      });
+    onSuccess: () => {
+      toast.success(`Request sent to ${product.supplier.name}`, { description: "They will contact you shortly." });
       setOpen(false);
     },
     onError: () => toast.error("Could not send your request. Try again."),

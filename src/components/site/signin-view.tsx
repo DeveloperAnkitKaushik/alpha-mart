@@ -7,7 +7,6 @@ import { BellRing, CheckCircle2, ClipboardList, Clock, MessageCircle } from "luc
 import { AuthForm } from "@/components/site/auth-form";
 import { Wordmark } from "@/components/site/wordmark";
 import { signOutUser, useAuth } from "@/lib/auth-store";
-import { isFirebaseConfigured } from "@/lib/firebase";
 
 const BENEFITS = [
   { icon: ClipboardList, title: "Every enquiry in one place", body: "See the laptops you asked about and their status." },
@@ -96,9 +95,7 @@ export function SignInView({ embedded = false }: { embedded?: boolean }) {
         <section className="relative flex items-center justify-center p-6 sm:p-12">
           <div className="absolute inset-x-0 top-0 h-1.5 bg-[linear-gradient(90deg,#4285F4_0_25%,#EA4335_25%_50%,#FBBC05_50%_75%,#34A853_75%)]" aria-hidden />
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="w-full max-w-md">
-            {!isFirebaseConfigured ? (
-              <p className="rounded-2xl bg-cream p-6 text-center text-sm text-muted-foreground">Sign-in is unavailable in demo mode because Firebase is not configured.</p>
-            ) : ready && email ? (
+            {ready && email ? (
               <div className="text-center">
                 <CheckCircle2 className="mx-auto size-12 text-[#34A853]" />
                 <h1 className="mt-3 text-2xl font-extrabold text-navy">You&apos;re signed in</h1>

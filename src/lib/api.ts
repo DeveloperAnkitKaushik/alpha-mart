@@ -1,30 +1,20 @@
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getFirebaseAuth, getDb, isFirebaseConfigured } from "./firebase";
-import { leadSchema, requirementSchema, type LeadInput, type RequirementInput } from "./data";
+"use server";
 
-export type SubmitResult = { demo: boolean };
+import { db } from "@/lib/server/db";
+import { leads, requirements } from "@/lib/server/db/schema";
+import { currentUser } from "@/lib/server/auth";
+import { randomId } from "@/lib/server/random-id";
+import { leadSchema, requirementSchema } from "./data";
 
-// Firestore rejects undefined field values.
-const defined = (o: object) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
-
-export async function createLead(input: LeadInput): Promise<SubmitResult> {
+// Public: anyone can enquire; a signed-in buyer's uid ties it to their dashboard.
+export async function createLead(input: unknown): Promise<void> {
   const data = leadSchema.parse(input);
-  if (!isFirebaseConfigured) return { demo: true };
-  await addDoc(collection(getDb(), "leads"), {
-    ...defined(data),
-    uid: getFirebaseAuth().currentUser?.uid ?? null,
-    createdAt: serverTimestamp(),
-  });
-  return { demo: false };
+  const uid = (await currentUser())?.id ?? null;
+  await db().insert(leads).values({ ...data, id: randomId(), uid, status: "new", notes: "", createdAt: new Date() });
 }
 
-export async function createRequirement(input: RequirementInput): Promise<SubmitResult> {
+export async function createRequirement(input: unknown): Promise<void> {
   const data = requirementSchema.parse(input);
-  if (!isFirebaseConfigured) return { demo: true };
-  await addDoc(collection(getDb(), "requirements"), {
-    ...defined(data),
-    uid: getFirebaseAuth().currentUser?.uid ?? null,
-    createdAt: serverTimestamp(),
-  });
-  return { demo: false };
+  const uid = (await currentUser())?.id ?? null;
+  await db().insert(requirements).values({ ...data, id: randomId(), uid, status: "new", notes: "", createdAt: new Date() });
 }

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { listCoupons, saveCoupon } from "@/lib/store/admin-actions";
 import { couponCodeSchema, couponSchema, type Coupon } from "@/lib/store/schemas";
 import { addBtn, inputClass, Label, Toggle } from "../items/fields";
-import { AdminError, adminToken, unwrap } from "./admin-call";
+import { AdminError, unwrap } from "./admin-call";
 
 type Row = Coupon & { code: string };
 type Form = { code: string; type: Coupon["type"]; value: string; maxDiscount: string; minOrder: string; expiresAt: string; active: boolean; maxUses: string; oncePerCustomer: boolean };
@@ -32,7 +32,7 @@ function CouponDialog({ initial, uses, onClose }: { initial: Form; uses: number 
         expiresAt: f.expiresAt, active: f.active, maxUses: orNull(f.maxUses), oncePerCustomer: f.oncePerCustomer,
       });
       if (!parsed.success) throw new Error("Check the numbers and the expiry date.");
-      return unwrap(await saveCoupon(await adminToken(), code.data, parsed.data));
+      return unwrap(await saveCoupon(code.data, parsed.data));
     },
     onSuccess: () => {
       toast.success("Coupon saved");
@@ -92,7 +92,7 @@ export function CouponsTab() {
   const [editing, setEditing] = useState<Row | "new" | null>(null);
   const q = useQuery({
     queryKey: ["admin-coupons"],
-    queryFn: async () => unwrap(await listCoupons(await adminToken())).coupons,
+    queryFn: async () => unwrap(await listCoupons()).coupons,
     retry: false,
   });
 

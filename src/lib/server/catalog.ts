@@ -1,12 +1,11 @@
-import { z } from "zod";
-import { adminDb } from "@/lib/server/firebase-admin";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/server/db";
+import { siteContent } from "@/lib/server/db/schema";
 import { DEFAULT_CONTENT, siteContentSchema, type SiteContent } from "@/lib/site-content";
-
-const storedContent = z.object({ json: z.string() });
 
 // Uncached on purpose: checkout prices must come from the latest published catalogue.
 export async function loadCatalog(): Promise<SiteContent> {
-  const snap = await adminDb().doc("site/content").get();
-  if (!snap.exists) return DEFAULT_CONTENT;
-  return siteContentSchema.parse(JSON.parse(storedContent.parse(snap.data()).json));
+  const [row] = await db().select({ json: siteContent.json }).from(siteContent).where(eq(siteContent.id, 1)).limit(1);
+  if (!row) return DEFAULT_CONTENT;
+  return siteContentSchema.parse(JSON.parse(row.json));
 }
