@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/data";
 import { setOrderStatus, type listOrders } from "@/lib/store/admin-actions";
 import { STAFF_NEXT, type OrderStatus } from "@/lib/store/order-state";
 import { OrderStatusBadge } from "../badges";
-import { adminToken, unwrap } from "./admin-call";
+import { unwrap } from "./admin-call";
 
 type AdminOrder = Extract<Awaited<ReturnType<typeof listOrders>>, { ok: true }>["orders"][number];
 
@@ -21,7 +21,7 @@ function StatusForm({ order, onDone }: { order: AdminOrder; onDone: () => void }
   const [note, setNote] = useState(order.trackingNote);
   const client = useQueryClient();
   const save = useMutation({
-    mutationFn: async () => unwrap(await setOrderStatus(await adminToken(), order.id, to as OrderStatus, note.trim())),
+    mutationFn: async () => unwrap(await setOrderStatus(order.id, to as OrderStatus, note.trim())),
     onSuccess: () => {
       toast.success("Order updated");
       void client.invalidateQueries({ queryKey: ["admin-orders"] });

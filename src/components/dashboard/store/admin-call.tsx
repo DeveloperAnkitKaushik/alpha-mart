@@ -3,11 +3,6 @@
 import { RotateCw, ServerCrash } from "lucide-react";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
-import { useAuth } from "@/lib/auth-store";
-
-export async function adminToken(): Promise<string> {
-  return (await useAuth.getState().user?.getIdToken()) ?? "";
-}
 
 // Turns an action's { ok: false } into a thrown Error so TanStack Query shows the error state.
 export function unwrap<T extends { ok: boolean }>(res: T): Extract<T, { ok: true }> {

@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, limit, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { PackageOpen, RotateCw, WifiOff } from "lucide-react";
-import { z } from "zod";
 import { OrderStatusBadge } from "@/components/dashboard/badges";
 import { SignInView } from "@/components/site/signin-view";
 import { StateCard } from "@/components/site/state-card";
@@ -12,25 +10,16 @@ import { stateBtn } from "@/components/site/state-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-store";
 import { formatPrice } from "@/lib/data";
-import { getDb } from "@/lib/firebase";
-import { ORDER_STATUSES } from "@/lib/store/order-state";
+import { listMyOrders } from "@/lib/store/checkout-actions";
 
-const orderRow = z.object({
-  total: z.number(),
-  status: z.enum(ORDER_STATUSES),
-  createdAt: z.instanceof(Timestamp),
-});
-
-async function loadOrders(uid: string) {
-  const snap = await getDocs(query(collection(getDb(), "orders"), where("uid", "==", uid), orderBy("createdAt", "desc"), limit(50)));
-  return snap.docs.flatMap((d) => {
-    const r = orderRow.safeParse(d.data());
-    return r.success ? [{ id: d.id, ...r.data }] : [];
-  });
+async function loadOrders() {
+  const r = await listMyOrders();
+  if (!r.ok) throw new Error(r.error);
+  return r.orders;
 }
 
 function List({ uid }: { uid: string }) {
-  const orders = useQuery({ queryKey: ["orders", uid], queryFn: () => loadOrders(uid) });
+  const orders = useQuery({ queryKey: ["orders", uid], queryFn: loadOrders });
 
   if (orders.isError) {
     return (
@@ -60,7 +49,7 @@ function List({ uid }: { uid: string }) {
             className="flex min-h-11 items-center justify-between gap-3 rounded-2xl bg-white p-4 ring-1 ring-border transition hover:bg-cream"
           >
             <span>
-              <span className="block font-bold text-navy-deep">{o.createdAt.toDate().toLocaleDateString("en-IN", { dateStyle: "medium" })}</span>
+              <span className="block font-bold text-navy-deep">{new Date(o.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}</span>
               <span className="text-sm text-muted-foreground">{formatPrice(o.total)}</span>
             </span>
             <OrderStatusBadge status={o.status} />

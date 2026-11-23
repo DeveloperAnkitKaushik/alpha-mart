@@ -41,8 +41,6 @@ export class AuthClientError extends Error {
   }
 }
 
-// Redirects to Google and back to the page the user started on.
-export const signInWithGoogle = () => call(authClient.signIn.social({ provider: "google", callbackURL: window.location.href }));
 export const signOutUser = () => call(authClient.signOut());
 
 export const signInWithEmail = (email: string, password: string) => call(authClient.signIn.email({ email, password }));
@@ -60,7 +58,6 @@ const AUTH_ERRORS: Record<string, string> = {
   PASSWORD_TOO_SHORT: "Use at least 6 characters for your password.",
   INVALID_EMAIL: "Enter a valid email address.",
   INVALID_TOKEN: "This reset link has expired. Ask for a new one.",
-  PROVIDER_NOT_FOUND: "Google sign-in isn't set up yet. Use email and password.",
   TOO_MANY_REQUESTS: "Too many attempts. Try again in a few minutes.",
 };
 

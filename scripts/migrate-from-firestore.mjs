@@ -1,6 +1,5 @@
 // One-off copy of Firestore + Firebase Auth into MySQL. Safe to re-run: INSERT IGNORE only adds missing rows.
 // Usage: FIREBASE_SERVICE_ACCOUNT=<base64 json> DATABASE_URL=mysql://... node scripts/migrate-from-firestore.mjs
-import { randomBytes } from "node:crypto";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -13,7 +12,6 @@ const sql = await createConnection({ uri: process.env.DATABASE_URL, timezone: "Z
 
 const date = (v) => (v instanceof Timestamp ? v.toDate() : v ? new Date(v) : new Date());
 const json = (v) => JSON.stringify(v);
-const newId = () => randomBytes(16).toString("hex");
 const counts = {};
 
 async function insert(table, row) {
@@ -39,9 +37,6 @@ do {
       created_at: new Date(u.metadata.creationTime),
       updated_at: new Date(),
     });
-    for (const p of u.providerData.filter((p) => p.providerId === "google.com")) {
-      await insert("account", { id: newId(), account_id: p.uid, provider_id: "google", user_id: u.uid, created_at: new Date(), updated_at: new Date() });
-    }
   }
 } while (page.pageToken);
 

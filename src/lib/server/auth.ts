@@ -4,12 +4,11 @@ import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/server/db";
 import * as schema from "@/lib/server/db/schema";
-import { googleEnv, serverEnv } from "@/lib/server/env";
+import { serverEnv } from "@/lib/server/env";
 import { sendMail } from "@/lib/server/mail";
 
 function createAuth() {
   const env = serverEnv();
-  const google = googleEnv();
   return betterAuth({
     baseURL: env.SITE_URL,
     secret: env.BETTER_AUTH_SECRET,
@@ -21,9 +20,6 @@ function createAuth() {
       sendResetPassword: ({ user, url }) =>
         sendMail(user.email, "Reset your Alpha Mart password", `Open this link to set a new password (valid for 1 hour):\n\n${url}\n\nIf you didn't ask for this, ignore this email.`),
     },
-    socialProviders: google ? { google: { clientId: google.GOOGLE_CLIENT_ID, clientSecret: google.GOOGLE_CLIENT_SECRET } } : {},
-    // Users moved over from Firebase have no Google account row yet; Google's verified email links them.
-    account: { accountLinking: { enabled: true, trustedProviders: ["google"] } },
     session: { cookieCache: { enabled: true, maxAge: 300 } },
   });
 }

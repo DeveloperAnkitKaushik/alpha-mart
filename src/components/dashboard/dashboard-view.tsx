@@ -1,14 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, PlugZap, RotateCw, ShieldAlert } from "lucide-react";
+import { LogOut, RotateCw, ShieldAlert } from "lucide-react";
 import { StateCard } from "@/components/site/state-card";
 import { stateBtn } from "@/components/site/state-styles";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 import { SignInView } from "@/components/site/signin-view";
 import { signOutUser, useAuth } from "@/lib/auth-store";
-import { isAdmin } from "@/lib/dashboard-api";
-import { isFirebaseConfigured } from "@/lib/firebase";
+import { amIAdmin } from "@/lib/inbox-actions";
 import { BuyerView } from "./buyer-view";
 import { StaffView } from "./staff-view";
 
@@ -32,7 +31,7 @@ function Header({ staff }: { staff: boolean }) {
 }
 
 function SignedIn({ uid }: { uid: string }) {
-  const role = useQuery({ queryKey: ["isAdmin", uid], queryFn: () => isAdmin(uid), staleTime: Infinity });
+  const role = useQuery({ queryKey: ["isAdmin", uid], queryFn: () => amIAdmin(), staleTime: Infinity });
   if (role.isPending) return <DashboardSkeleton />;
   if (role.isError) {
     return (
@@ -55,16 +54,6 @@ export function DashboardView() {
   const uid = useAuth((s) => s.user?.uid ?? null);
   const ready = useAuth((s) => s.ready);
 
-  if (!isFirebaseConfigured) {
-    return (
-      <StateCard
-        icon={PlugZap}
-        tone="info"
-        title="Dashboard unavailable in demo mode"
-        body={<>Firebase is not configured. Copy <code>.env.example</code> to <code>.env.local</code> and fill in your project keys to see enquiries here.</>}
-      />
-    );
-  }
   if (!ready) return <DashboardSkeleton />;
   if (!uid) return <SignInView embedded />;
   return <SignedIn key={uid} uid={uid} />;

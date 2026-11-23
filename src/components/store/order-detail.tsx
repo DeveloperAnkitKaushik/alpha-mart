@@ -94,9 +94,8 @@ function Detail({ uid, orderId }: { uid: string; orderId: string }) {
     queryKey: ["order", uid, orderId],
     retry: false,
     queryFn: async () => {
-      const user = useAuth.getState().user;
-      if (!user) throw new Error("signed out");
-      const r = await getMyOrder(await user.getIdToken(), orderId);
+      if (!useAuth.getState().user) throw new Error("signed out");
+      const r = await getMyOrder(orderId);
       if (r.ok && PAID.includes(r.order.status)) clearOrderedCart(r.order.items);
       return r;
     },

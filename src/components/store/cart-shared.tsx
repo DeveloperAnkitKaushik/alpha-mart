@@ -32,10 +32,7 @@ function usePreview(lines: CartLine[], code: string | null, enabled: boolean) {
     enabled: enabled && lines.length > 0,
     retry: false,
     staleTime: 0,
-    queryFn: async () => {
-      const user = useAuth.getState().user;
-      return previewTotals(user ? await user.getIdToken() : null, lines, code);
-    },
+    queryFn: () => previewTotals(lines, code),
   });
 }
 

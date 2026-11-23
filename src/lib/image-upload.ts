@@ -1,9 +1,8 @@
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getDb, getFirebaseAuth } from "./firebase";
+import { uploadImageData } from "./image-actions";
 import { imageSrc } from "./site-content";
 
 const MAX_INPUT_BYTES = 15 * 1024 * 1024;
-// Firestore caps a document at 1 MiB; base64 adds a third, so the encoded image must stay under ~700 KB.
+// Server actions accept a 1 MB body by default; base64 adds a third, so the encoded image must stay under ~700 KB.
 const MAX_ENCODED = 950_000;
 const ATTEMPTS = [
   { width: 1920, quality: 0.82 },
@@ -38,12 +37,10 @@ async function compress(bitmap: ImageBitmap, width: number, quality: number): Pr
   return { data: await toBase64(blob), type: blob.type };
 }
 
-// Compresses to WebP (JPEG on Safari) in the browser and stores it in Firestore; returns the path that serves it.
+// Compresses to WebP (JPEG on Safari) in the browser and stores it in the database; returns the path that serves it.
 export async function uploadImage(file: File): Promise<string> {
   if (!/^image\/(png|jpe?g|webp|gif|avif)$/.test(file.type)) throw new Error("Use a PNG, JPG, WebP, GIF or AVIF image.");
   if (file.size > MAX_INPUT_BYTES) throw new Error("That image is over 15 MB. Pick a smaller one.");
-  const uid = getFirebaseAuth().currentUser?.uid;
-  if (!uid) throw new Error("Your session expired. Sign in again.");
 
   let bitmap: ImageBitmap;
   try {
@@ -55,8 +52,9 @@ export async function uploadImage(file: File): Promise<string> {
     for (const { width, quality } of ATTEMPTS) {
       const { data, type } = await compress(bitmap, width, quality);
       if (data.length > MAX_ENCODED) continue;
-      const ref = await addDoc(collection(getDb(), "images"), { data, type, by: uid, createdAt: serverTimestamp() });
-      return `/api/img/${ref.id}`;
+      const res = await uploadImageData({ data, type });
+      if (!res.ok) throw new Error(res.error);
+      return res.src;
     }
   } finally {
     bitmap.close();

@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         Orders are paid through PhonePe. Payment is handled on PhonePe&apos;s own pages, and <strong>we do not see or store your card, UPI PIN or netbanking details</strong>. We receive only the payment status and transaction reference needed to confirm your order.
       </p>
       <h2>Where it is stored</h2>
-      <p>Account and order data is stored with Google Firebase. Access is limited to our staff who need it to serve you.</p>
+      <p>Account and order data is stored in our database on our hosting provider, Hostinger. Access is limited to our staff who need it to serve you.</p>
       <h2>Sharing</h2>
       <p>
         We share your name, phone number and address with the courier delivering your order, and payment information with PhonePe. We do not sell your personal data.

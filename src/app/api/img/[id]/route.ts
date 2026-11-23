@@ -1,27 +1,26 @@
+import { eq } from "drizzle-orm";
 import { cacheLife } from "next/cache";
-import { z } from "zod";
-import { firestoreDoc } from "@/lib/site-content-server";
+import { db } from "@/lib/server/db";
+import { images } from "@/lib/server/db/schema";
 
-const imageDoc = z.object({
-  fields: z.object({
-    data: z.object({ stringValue: z.string() }),
-    type: z.object({ stringValue: z.enum(["image/webp", "image/jpeg"]) }),
-  }),
-});
+// The cache may hand back the Buffer as a plain Uint8Array.
+type Stored = { data: Uint8Array; type: "image/webp" | "image/jpeg" } | { status: number };
 
-type Stored = { data: string; type: "image/webp" | "image/jpeg" } | { status: number };
-
-// Image docs are write-once, so a found image is cached for good; misses are retried soon.
+// Images are write-once, so a found image is cached for good; misses are retried soon.
 async function loadImage(id: string): Promise<Stored> {
   "use cache";
-  const res = await fetch(firestoreDoc(`images/${id}`));
-  const doc = res.ok ? imageDoc.safeParse(await res.json()) : null;
-  if (!doc?.success) {
+  try {
+    const [row] = await db().select({ data: images.data, type: images.type }).from(images).where(eq(images.id, id)).limit(1);
+    if (row) {
+      cacheLife("max");
+      return row;
+    }
     cacheLife("seconds");
-    return { status: res.ok || res.status === 404 ? 404 : 502 };
+    return { status: 404 };
+  } catch {
+    cacheLife("seconds");
+    return { status: 502 };
   }
-  cacheLife("max");
-  return { data: doc.data.fields.data.stringValue, type: doc.data.fields.type.stringValue };
 }
 
 // Serves an admin-uploaded image.
@@ -30,7 +29,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/img/[id]">) {
   if (!/^[A-Za-z0-9]{10,40}$/.test(id)) return new Response(null, { status: 404 });
   const img = await loadImage(id);
   if ("status" in img) return new Response(null, { status: img.status });
-  return new Response(Buffer.from(img.data, "base64"), {
+  return new Response(new Uint8Array(img.data), {
     headers: {
       "Content-Type": img.type,
       "Cache-Control": "public, max-age=31536000, immutable",

@@ -1,33 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSiteContent } from "@/components/site/site-content";
-import { subscribeInbox, subscribeMine, type InboxItem } from "@/lib/dashboard-api";
+import { toItems, type InboxItem } from "@/lib/dashboard-api";
+import { listInbox, listMyInbox } from "@/lib/inbox-actions";
 
 type InboxState = { items: InboxItem[] | null; error: boolean; retry: () => void };
 
-// Live Firestore listener: staff get every item, a buyer gets only their own.
+export const INBOX_KEY = ["inbox"] as const;
+
+// Staff get every item and poll for new ones; a buyer gets only their own.
 export function useInbox(mode: "staff" | { uid: string }): InboxState {
-  const uid = mode === "staff" ? null : mode.uid;
-  const [state, setState] = useState<{ items: InboxItem[] | null; error: boolean }>({ items: null, error: false });
-  const [attempt, setAttempt] = useState(0);
-  // Read at call time so a catalogue change doesn't tear down the live listener.
+  const staff = mode === "staff";
+  const query = useQuery({
+    queryKey: [...INBOX_KEY, staff ? "staff" : mode.uid],
+    queryFn: staff ? () => listInbox() : () => listMyInbox(),
+    refetchInterval: staff ? 30_000 : false,
+  });
   const products = useSiteContent().products;
-  const productsRef = useRef(products);
-  useEffect(() => {
-    productsRef.current = products;
-  }, [products]);
-  useEffect(() => {
-    const nameOf = (id: string) => productsRef.current.find((p) => p.id === id)?.name ?? id;
-    const onData = (items: InboxItem[]) => setState({ items, error: false });
-    const onError = () => setState((s) => ({ ...s, error: true }));
-    return uid ? subscribeMine(uid, nameOf, onData, onError) : subscribeInbox(nameOf, onData, onError);
-  }, [uid, attempt]);
-  const retry = useCallback(() => {
-    setState({ items: null, error: false });
-    setAttempt((a) => a + 1);
-  }, []);
-  return { ...state, retry };
+  const items = useMemo(
+    () => (query.data ? toItems(query.data, (id) => products.find((p) => p.id === id)?.name ?? id) : null),
+    [query.data, products],
+  );
+  const { refetch } = query;
+  return { items, error: query.isError, retry: () => void refetch() };
 }
 
 export function useNow(): number {

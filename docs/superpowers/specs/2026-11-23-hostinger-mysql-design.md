@@ -7,7 +7,7 @@ The owner will run ads. Firestore's free tier (50k reads/day) runs out at a few 
 ## Goals
 
 - Every piece of data lives in the MySQL/MariaDB database that comes with Hostinger Cloud Startup.
-- Sign-in (email + password, Google, password reset) runs inside the Next.js app.
+- Sign-in (email + password, password reset) runs inside the Next.js app. Google sign-in was dropped at the owner's request.
 - Store logic stays the same: pricing, coupons, stock holds, order states, PhonePe flow and their 51 tests.
 - Existing Firestore data (site content, images, stock, coupons, orders, leads, requirements, carts, favourites, profiles, admins, users) is copied across, keeping the same IDs, so image URLs, order links and PhonePe merchant order IDs stay valid.
 - The `firebase` and `firebase-admin` packages, `firestore.rules`, `firestore.indexes.json` and `firebase.json` are removed.
@@ -15,7 +15,7 @@ The owner will run ads. Firestore's free tier (50k reads/day) runs out at a few 
 ## Non-goals
 
 - A separate backend service. Next.js server actions and route handlers already are the backend.
-- Moving users' Firebase password hashes. Email/password users set a new password through "Forgot password". Google users sign in with Google again and land on the same account (matched by email).
+- Moving users' Firebase password hashes. Existing users set a new password through "Forgot password" (former Google users too).
 - Realtime pushes. Firestore `onSnapshot` listeners become TanStack Query reads with polling where staff need fresh data.
 
 ## Approaches considered
@@ -26,8 +26,8 @@ The owner will run ads. Firestore's free tier (50k reads/day) runs out at a few 
 
 ## Decisions
 
-- **Database:** MariaDB (what Hostinger provides), accessed through Drizzle ORM and `mysql2`. Schema lives in `src/lib/server/db/schema.ts`. Migrations are generated with `drizzle-kit` and committed under `drizzle/`.
-- **Auth:** Better Auth with its Drizzle adapter. It covers email/password, Google OAuth, password reset, cookie sessions and built-in rate limiting. Minimum password length stays 6 to match the existing form.
+- **Database:** MariaDB (what Hostinger provides), accessed through Drizzle ORM and `mysql2`. Schema lives in `src/lib/server/db/schema.ts`. Migrations are generated with `drizzle-kit`, committed under `drizzle/`, and applied automatically at server start by `src/instrumentation.ts`.
+- **Auth:** Better Auth with its Drizzle adapter. It covers email/password, password reset, cookie sessions and built-in rate limiting. Minimum password length stays 6 to match the existing form.
 - **Sessions:** server actions read the session cookie with `auth.api.getSession({ headers })`. They no longer take an `idToken` argument. `requireUser()` and `requireAdmin()` keep their names and return the user id.
 - **Admins:** an `admins` table keyed by user id, as today.
 - **Reset emails:** sent with `nodemailer` through a Hostinger mailbox (SMTP). Without SMTP env, the reset button explains that reset isn't available yet.
@@ -41,12 +41,11 @@ The owner will run ads. Firestore's free tier (50k reads/day) runs out at a few 
 
 ## New environment
 
-`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (same as `SITE_URL`), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`. The `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_SERVICE_ACCOUNT` variables go away.
+`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (same as `SITE_URL`), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`. The `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_SERVICE_ACCOUNT` variables go away.
 
 ## Owner setup
 
 - Create a MySQL database and user in hPanel → Databases.
-- Create a Google OAuth client (Google Cloud Console → Credentials) with redirect URI `https://<site>/api/auth/callback/google`.
 - Create a mailbox such as `no-reply@<domain>` for reset emails.
 
 ## Left to the builder

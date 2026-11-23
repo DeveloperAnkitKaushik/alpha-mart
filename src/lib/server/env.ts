@@ -6,8 +6,7 @@ const serverSchema = z.object({
   SITE_URL: z.url().transform((u) => u.replace(/\/+$/, "")),
 });
 
-// Optional: without them the Google button and reset emails explain they're unavailable.
-const googleSchema = z.object({ GOOGLE_CLIENT_ID: z.string().min(1), GOOGLE_CLIENT_SECRET: z.string().min(1) });
+// Optional: without it, reset emails fail with a clear error.
 const smtpSchema = z.object({
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int(),
@@ -41,5 +40,4 @@ function lazy<S extends z.ZodType>(schema: S): () => z.output<S> {
 // Only successes are memoised, so a failed read never sticks.
 export const serverEnv = lazy(serverSchema);
 export const phonepeEnv = lazy(phonepeSchema);
-export const googleEnv = () => googleSchema.safeParse(process.env).data ?? null;
 export const smtpEnv = () => smtpSchema.safeParse(process.env).data ?? null;
