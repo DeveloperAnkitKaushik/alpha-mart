@@ -23,8 +23,10 @@ async function insert(table, row) {
 const docs = async (name) => (await fs.collection(name).get()).docs;
 
 // Users first so everything else that points at a uid still resolves.
+// SKIP_USERS=1 leaves accounts behind: without reset emails, copied users could neither sign in nor re-register.
+const copyUsers = process.env.SKIP_USERS !== "1";
 let page;
-do {
+while (copyUsers) {
   page = await getAuth(app).listUsers(1000, page?.pageToken);
   for (const u of page.users) {
     if (!u.email) continue;
@@ -38,9 +40,10 @@ do {
       updated_at: new Date(),
     });
   }
-} while (page.pageToken);
+  if (!page.pageToken) break;
+}
 
-for (const d of await docs("admins")) await insert("admins", { user_id: d.id });
+if (copyUsers) for (const d of await docs("admins")) await insert("admins", { user_id: d.id });
 
 const content = await fs.doc("site/content").get();
 if (content.exists) await insert("site_content", { id: 1, json: content.get("json"), updated_at: new Date() });
